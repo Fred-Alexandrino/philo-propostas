@@ -113,9 +113,25 @@ function calcularDadosIniciais(inputs) {
   const consumoDiario = consumoTotal / 30;                                         // F21
   const hspEfetivo = hspMedio * CONST.EFICIENCIA_SISTEMA;                          // F25
   const potenciaMinimaKwp = consumoDiario / hspEfetivo;                            // F26
+  const quantidadePaineisSugerida = inputs.potenciaPainelW
+    ? Math.ceil((potenciaMinimaKwp * 1000) / inputs.potenciaPainelW)
+    : null; // referência — não define a potência do sistema, só orienta a escolha
 
-  const potenciaSistemaKwp = inputs.potenciaSistemaKwp ?? potenciaMinimaKwp;
-  const quantidadePaineis = Math.ceil((potenciaSistemaKwp * 1000) / inputs.potenciaPainelW); // F28 (ROUNDUP)
+  // A potência do sistema é sempre uma consequência da quantidade de módulos
+  // escolhida × a potência do módulo — nunca o inverso. Se a quantidade não for
+  // informada ainda (ex: só calculando a potência mínima), cai no mínimo teórico
+  // exato, sem arredondar para um número de painéis.
+  let potenciaSistemaKwp, quantidadePaineis;
+  if (inputs.quantidadeModulos) {
+    quantidadePaineis = inputs.quantidadeModulos;
+    potenciaSistemaKwp = (inputs.quantidadeModulos * inputs.potenciaPainelW) / 1000;
+  } else if (inputs.potenciaSistemaKwp) {
+    potenciaSistemaKwp = inputs.potenciaSistemaKwp;
+    quantidadePaineis = Math.ceil((potenciaSistemaKwp * 1000) / inputs.potenciaPainelW);
+  } else {
+    potenciaSistemaKwp = potenciaMinimaKwp;
+    quantidadePaineis = quantidadePaineisSugerida;
+  }
   const areaSistemaM2 = quantidadePaineis * CONST.TAMANHO_PLACA_M2;                 // C10
   const pesoSistemaKg = quantidadePaineis * CONST.PESO_PLACA_KG;                    // C11
 
@@ -128,7 +144,8 @@ function calcularDadosIniciais(inputs) {
 
   return {
     tarifaMedia, consumoTotal, consumoDiario, hspMedio,
-    potenciaMinimaKwp, potenciaSistemaKwp, quantidadePaineis,
+    potenciaMinimaKwp, quantidadePaineisSugerida,
+    potenciaSistemaKwp, quantidadePaineis,
     areaSistemaM2, pesoSistemaKg,
     geracaoMensalKwh, geracaoMediaMensalKwh, geracaoAnualKwh,
   };
