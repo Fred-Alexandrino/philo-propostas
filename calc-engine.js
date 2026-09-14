@@ -31,6 +31,7 @@ const CONST = {
   // CUSTOS DIRETOS — valores sugeridos automaticamente (ajustáveis na tela):
   MAO_DE_OBRA_POR_KWP: 350,        // R$/kWp — solicitado por Fred
   IMPOSTO_INSTALACAO_PERC: 0.10,   // 10% em cima do valor final (sale price), calculado de forma fechada (ver sugerirCustosInstalacao)
+  MARGEM_LUCRO_PERC: 0.20,         // 20% — margem de lucro padrão, editável por proposta
   // Material CA — tabela CUSTOS PROJETO!I4:L6, varia por tipo de telhado/local
   CUSTOS_INSTALACAO: {
     "telhado_fortaleza": { materialCAPorKwp: 220.00 },
@@ -168,21 +169,12 @@ function calcularDadosIniciais(inputs) {
  * @param {Object} dadosIniciais - retorno de calcularDadosIniciais()
  */
 function calcularCustos(inputs, dadosIniciais) {
-  const kwp = dadosIniciais.potenciaSistemaKwp;
   const materiaisKit = inputs.valorMaterialFornecedor;                              // MATERIAL!G7
-
-  // Custos diretos — preenchidos na tela (com sugestão automática, ver sugerirCustosInstalacao)
   const maoDeObraInstalacao = inputs.maoDeObraInstalacao || 0;
   const materialInstalacao = inputs.materialInstalacao || 0;
   const impostoInstalacao = inputs.impostoInstalacao || 0;
-  const custosDiretos = maoDeObraInstalacao + materialInstalacao + impostoInstalacao;
 
-  // Custos indiretos — continuam automáticos por kWp (ART, visita técnica, terceirização)
-  const custosIndiretos = calcularCustosIndiretos(kwp, inputs);
-
-  const custosDiversos = custosDiretos + custosIndiretos;                           // CUSTOS PROJETO!C4
-
-  return { materiaisKit, custosDiretos, custosIndiretos, custosDiversos };
+  return { materiaisKit, maoDeObraInstalacao, materialInstalacao, impostoInstalacao };
 }
 
 function calcularCustosIndiretos(kwp, extras = {}) {
@@ -199,66 +191,54 @@ function calcularCustosIndiretos(kwp, extras = {}) {
  * tela (o usuário pode ajustar cada um depois):
  *  - Mão de obra: R$ 350/kWp
  *  - Material CA: tabela por tipo de telhado/local (mesma da planilha original)
- *  - Imposto: 10% sobre o valor final de venda — como o valor final também
- *    depende do imposto (ele entra no custo antes do BDI), a conta é resolvida
- *    de forma fechada: receita = baseSemImposto / (1 - BDI - 10%)
+ *  - Imposto: 10% sobre o valor final da proposta — como o valor final também
+ *    depende do imposto (ele entra na soma antes da margem), a conta é resolvida
+ *    de forma fechada: valorFinal = base*(1+margem) / (1 - imposto%*(1+margem))
  */
-function sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao }) {
+function sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao, margemLucroPerc }) {
   const kwp = potenciaSistemaKwp;
   const cfg = CONST.CUSTOS_INSTALACAO[tipoInstalacao] || CONST.CUSTOS_INSTALACAO.telhado_outras;
+  const margem = margemLucroPerc ?? CONST.MARGEM_LUCRO_PERC;
 
   const maoDeObraInstalacao = kwp * CONST.MAO_DE_OBRA_POR_KWP;
   const materialInstalacao = kwp * cfg.materialCAPorKwp;
-  const custosIndiretos = calcularCustosIndiretos(kwp);
 
-  const baseSemImposto = (valorMaterialFornecedor || 0) + maoDeObraInstalacao + materialInstalacao + custosIndiretos;
-  const divisor = 1 - CONST.BDI - CONST.IMPOSTO_INSTALACAO_PERC;
-  const receitaEstimada = baseSemImposto / divisor;
-  const impostoInstalacao = CONST.IMPOSTO_INSTALACAO_PERC * receitaEstimada;
+  const base = (valorMaterialFornecedor || 0) + maoDeObraInstalacao + materialInstalacao;
+  const divisor = 1 - CONST.IMPOSTO_INSTALACAO_PERC * (1 + margem);
+  const valorFinalEstimado = (base * (1 + margem)) / divisor;
+  const impostoInstalacao = CONST.IMPOSTO_INSTALACAO_PERC * valorFinalEstimado;
 
   return { maoDeObraInstalacao, materialInstalacao, impostoInstalacao };
 }
 
 // ─────────────────────────────────────────────────────────────
-// 4) DRE — precificação e condições comerciais
+// 4) PREÇO FINAL — kit + material CA + mão de obra + imposto + margem
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Valor final = valor do kit + material CA + mão de obra + imposto + margem de lucro.
+ * A margem de lucro é um percentual (padrão 20%) sobre a soma dos quatro
+ * primeiros itens, e é totalmente editável por proposta.
+ */
 function calcularDRE(custos, opts = {}) {
-  const comissaoVendaPerc = opts.comissaoVendaPerc || 0;
-  const artRespTecPerc = opts.artRespTecPerc || 0;
+  const margemLucroPerc = opts.margemLucroPerc ?? CONST.MARGEM_LUCRO_PERC;
 
-  // Aplica BDI sobre cada linha de custo — DRE!E6:E7
-  const vlrVendaKit = custos.materiaisKit / (1 - CONST.BDI);
-  const vlrVendaDiversos = custos.custosDiversos / (1 - CONST.BDI);
-  const receita = vlrVendaKit + vlrVendaDiversos;                                   // DRE!E4
+  const subtotal = custos.materiaisKit + custos.maoDeObraInstalacao + custos.materialInstalacao + custos.impostoInstalacao;
+  const margemLucro = margemLucroPerc * subtotal;
+  const valorFinal = subtotal + margemLucro;
 
-  // Impostos — DRE!E9:E12
-  const repasseFornecedor = CONST.REPASSE_FORNECEDOR * (receita - custos.materiaisKit);
-  const nfServicos = (receita - custos.materiaisKit - repasseFornecedor) * CONST.NF_SERVICOS;
-  const totalImpostos = repasseFornecedor + nfServicos;
-
-  // Custos (visão DRE) — DRE!E14:E20
-  const comissaoVenda = comissaoVendaPerc * receita;
-  const provisaoRisco = CONST.PROVISAO_RISCO * receita;
-  const artRespTec = artRespTecPerc * custos.materiaisKit;
-  const totalCustos = custos.materiaisKit + custos.custosDiversos + comissaoVenda + provisaoRisco + artRespTec;
-
-  const lucro = receita - totalImpostos - totalCustos;                              // DRE!E22
-  const margemLucro = lucro / receita;                                             // DRE!G22
-
-  // Condições comerciais — DRE!G2:M9
-  const valorVendaFinal = receita;                                                  // (ajuste manual de centavos não replicado)
-  const totalAVista = valorVendaFinal * (1 - CONST.DESCONTO_A_VISTA);
-  const parcelaTotalParcelado = valorVendaFinal / CONST.PARCELAS_PADRAO;
+  const totalAVista = valorFinal * (1 - CONST.DESCONTO_A_VISTA);
+  const parcelaTotalParcelado = valorFinal / CONST.PARCELAS_PADRAO;
   const parcelaEntradaParcelada = custos.materiaisKit / CONST.PARCELAS_PADRAO;
-  const entradaParcelada = valorVendaFinal - custos.materiaisKit;
+  const entradaParcelada = valorFinal - custos.materiaisKit;
 
   return {
-    receita, valorVendaFinal, totalImpostos, totalCustos, lucro, margemLucro,
+    subtotal, margemLucroPerc, margemLucro,
+    receita: valorFinal, valorVendaFinal: valorFinal, lucro: margemLucro,
     condicoesComerciais: {
       aVista: totalAVista,
-      parcelado: { parcelas: CONST.PARCELAS_PADRAO, valorParcela: parcelaTotalParcelado, total: valorVendaFinal },
-      entradaParcelada: { parcelas: CONST.PARCELAS_PADRAO, valorParcela: parcelaEntradaParcelada, entrada: entradaParcelada, total: valorVendaFinal },
+      parcelado: { parcelas: CONST.PARCELAS_PADRAO, valorParcela: parcelaTotalParcelado, total: valorFinal },
+      entradaParcelada: { parcelas: CONST.PARCELAS_PADRAO, valorParcela: parcelaEntradaParcelada, entrada: entradaParcelada, total: valorFinal },
     },
   };
 }
