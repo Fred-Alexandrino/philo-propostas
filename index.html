@@ -151,19 +151,29 @@
 
     <div class="card">
       <h2>Custos de Instalação</h2>
-      <p style="color:var(--muted); font-size:13px; margin-top:-8px;">Preencha os valores reais dessa proposta (variam por fornecedor/região).</p>
+      <p style="color:var(--muted); font-size:13px; margin-top:-8px;">Valores sugeridos automaticamente — ajuste como quiser antes de gerar a proposta.</p>
+      <div class="field" style="max-width:320px;">
+        <label>Tipo de telhado/local</label>
+        <select id="tipoInstalacao">
+          <option value="telhado_fortaleza">Telhado — Fortaleza</option>
+          <option value="solo_fortaleza">Solo — Fortaleza</option>
+          <option value="telhado_outras">Telhado — Outras cidades</option>
+          <option value="solo_outras">Solo — Outras cidades</option>
+        </select>
+      </div>
+      <button type="button" class="secundario" id="btnSugerirCustos">Sugerir valores automaticamente</button>
       <table class="tabela-custos">
         <tbody>
           <tr>
-            <td>Mão de obra de instalação</td>
+            <td>Mão de obra de instalação (R$ 350/kWp)</td>
             <td><input type="number" step="0.01" id="maoDeObraInstalacao" placeholder="R$ 0,00"></td>
           </tr>
           <tr>
-            <td>Material de instalação</td>
+            <td>Material CA</td>
             <td><input type="number" step="0.01" id="materialInstalacao" placeholder="R$ 0,00"></td>
           </tr>
           <tr>
-            <td>Imposto</td>
+            <td>Imposto (10% sobre o valor final)</td>
             <td><input type="number" step="0.01" id="impostoInstalacao" placeholder="R$ 0,00"></td>
           </tr>
         </tbody>
