@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Philo Propostas — Painel de Geração de Propostas Comerciais</title>
+<style>
+  :root {
+    --bg: #0f1720; --card: #1a2530; --accent: #f5a623; --accent2: #2ecc71;
+    --text: #e8edf2; --muted: #8b9aab; --border: #2a3846;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  header {
+    padding: 24px 32px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  nav { display: flex; gap: 8px; }
+  nav button {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+  nav button.active { background: var(--accent); color: #1a1305; border-color: var(--accent); font-weight: 600; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; margin-bottom: 20px;
+  }
+  .card h2 { margin-top: 0; font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid.full { grid-template-columns: 1fr; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%; padding: 10px 12px; background: #0f1720; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .field { margin-bottom: 14px; }
+  .meses-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .meses-grid label { font-size: 11px; }
+  button.primary {
+    background: var(--accent); color: #1a1305; border: none; padding: 14px 24px;
+    border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%;
+  }
+  button.primary:disabled { opacity: .5; cursor: wait; }
+  .resultado { display: none; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: #0f1720; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .kpi .valor { font-size: 22px; font-weight: 700; color: var(--accent2); }
+  .kpi .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .downloads { display: flex; gap: 12px; margin-top: 16px; }
+  .downloads a {
+    flex: 1; text-align: center; padding: 12px; border-radius: 10px; text-decoration: none;
+    font-weight: 600; font-size: 14px;
+  }
+  .downloads a.docx { background: #2b579a; color: white; }
+  .downloads a.pdf { background: #c0392b; color: white; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
+  .erro { color: #e74c3c; }
+  .tela { display: none; }
+  .tela.active { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Philo <span>Propostas</span></h1>
+  <nav>
+    <button id="btn-nova" class="active">Nova Proposta</button>
+    <button id="btn-historico">Histórico</button>
+    <button id="btn-config">Configuração</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- TELA: NOVA PROPOSTA -->
+  <section id="tela-nova" class="tela active">
+
+    <div class="card">
+      <h2>Cliente e Local</h2>
+      <div class="grid">
+        <div class="field"><label>Nome do cliente</label><input id="nomeCliente" placeholder="Ex: João da Silva"></div>
+        <div class="field"><label>Cidade</label><input id="cidade" placeholder="Ex: São Gonçalo do Amarante"></div>
+        <div class="field"><label>UF</label><input id="uf" placeholder="Ex: CE" maxlength="2"></div>
+        <div class="field">
+          <label>Tipo de instalação</label>
+          <select id="tipoInstalacao">
+            <option value="telhado_fortaleza">Telhado — Fortaleza</option>
+            <option value="solo_fortaleza">Solo — Fortaleza</option>
+            <option value="telhado_outras">Telhado — Outras cidades</option>
+            <option value="solo_outras">Solo — Outras cidades</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Histórico de Consumo (últimos 12 meses, kWh)</h2>
+      <div class="meses-grid">
+        <div class="field"><label>Jan</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Fev</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Mar</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Abr</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Mai</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Jun</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Jul</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Ago</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Set</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Out</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Nov</label><input type="number" class="mes" value="0"></div>
+        <div class="field"><label>Dez</label><input type="number" class="mes" value="0"></div>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Tarifa média (R$/kWh)</label><input type="number" step="0.0001" id="tarifa" placeholder="Ex: 0.9246"></div>
+    </div>
+
+    <div class="card">
+      <h2>Sistema Fotovoltaico</h2>
+      <div class="grid">
+        <div class="field"><label>Potência do sistema (kWp) — deixe em branco para calcular o mínimo</label><input type="number" step="0.01" id="potenciaSistema" placeholder="Automático"></div>
+        <div class="field"><label>Potência da placa (Wp)</label><input type="number" id="potenciaPainel" placeholder="Ex: 710"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Fornecedor / Material</h2>
+      <div class="grid">
+        <div class="field"><label>Fornecedor</label><input id="fornecedor" placeholder="Ex: Sou Energy"></div>
+        <div class="field"><label>Valor do kit (R$)</label><input type="number" step="0.01" id="valorMaterial" placeholder="Ex: 53539.68"></div>
+      </div>
+    </div>
+
+    <button class="primary" id="btnGerar">Calcular e Gerar Proposta</button>
+    <div class="status" id="status"></div>
+
+    <div class="card resultado" id="resultado">
+      <h2>Resultado</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="valor" id="r-potencia">-</div><div class="label">Potência (kWp)</div></div>
+        <div class="kpi"><div class="valor" id="r-avista">-</div><div class="label">À vista</div></div>
+        <div class="kpi"><div class="valor" id="r-payback">-</div><div class="label">Payback</div></div>
+      </div>
+      <div class="downloads">
+        <a href="#" class="docx" id="link-docx" target="_blank">⬇ Baixar Word</a>
+        <a href="#" class="pdf" id="link-pdf" target="_blank">⬇ Baixar PDF</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- TELA: HISTÓRICO -->
+  <section id="tela-historico" class="tela">
+    <div class="card">
+      <h2>Propostas geradas</h2>
+      <table>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Local</th><th>kWp</th><th>Valor à vista</th><th>Payback</th><th></th></tr></thead>
+        <tbody id="tabela-historico"><tr><td colspan="7" style="color:var(--muted)">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TELA: CONFIGURAÇÃO -->
+  <section id="tela-config" class="tela">
+    <div class="card">
+      <h2>Conexão com o backend (Google Apps Script)</h2>
+      <div class="field">
+        <label>URL do Web App (gerada ao publicar o Apps Script)</label>
+        <input id="appsScriptUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+      </div>
+      <button class="primary" id="btnSalvarConfig" style="margin-top:10px;">Salvar</button>
+      <div class="status" id="status-config"></div>
+    </div>
+  </section>
+
+</main>
+
+<script src="calc-engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
