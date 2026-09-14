@@ -21,7 +21,9 @@
  *   {{VALOR_ENTRADA}} {{VALOR_ENTRADA_PARCELA}}
  *   {{ECONOMIA_MES}} {{ECONOMIA_ANO}} {{RETORNO_MES}} {{RETORNO_ANO}}
  *   {{PAYBACK}} {{PRODUCAO_ANUAL}} {{REAJUSTE_TARIFA}} {{DEGRADACAO_SISTEMA}}
- *   {{NOME_CLIENTE}} {{FORNECEDOR}}
+ *   {{NOME_CLIENTE}} {{ENDERECO_CLIENTE}} {{FORNECEDOR}}
+ *   {{UNIDADES_BENEFICIARIAS}} (opcional — só preencha esse marcador no modelo se o projeto
+ *   for de geração compartilhada / autoconsumo remoto; fica vazio quando há só uma unidade)
  */
 
 function doPost(e) {
@@ -101,7 +103,9 @@ function gerarProposta(body) {
     "{{REAJUSTE_TARIFA}}": fmtPerc(r.premissas.reajusteAnualTarifa),
     "{{DEGRADACAO_SISTEMA}}": fmtPerc(r.premissas.degradacaoAnualSistema),
     "{{NOME_CLIENTE}}": body.nomeCliente || "",
+    "{{ENDERECO_CLIENTE}}": body.enderecoCliente || "",
     "{{FORNECEDOR}}": body.fornecedor || "",
+    "{{UNIDADES_BENEFICIARIAS}}": listarUnidadesBeneficiarias(body.unidades),
   };
   Object.keys(substituicoes).forEach(tag => corpo.replaceText(tag, String(substituicoes[tag])));
   doc.saveAndClose();
@@ -137,6 +141,18 @@ function gerarProposta(body) {
     linkDocx: arquivoDocx.getUrl(),
     linkPdf: arquivoPdf.getUrl(),
   };
+}
+
+// Se houver unidades beneficiárias (geração compartilhada/autoconsumo remoto),
+// monta uma lista de texto com nome + endereço de cada uma, para uso opcional
+// no marcador {{UNIDADES_BENEFICIARIAS}} do modelo.
+function listarUnidadesBeneficiarias(unidades) {
+  if (!unidades || !unidades.length) return "";
+  const beneficiarias = unidades.filter(u => u.tipo === "beneficiaria");
+  if (!beneficiarias.length) return "";
+  return beneficiarias
+    .map((u, i) => `${i + 1}. ${u.nome || "Unidade beneficiária"}${u.endereco ? " — " + u.endereco : ""}`)
+    .join("\n");
 }
 
 function registrarHistorico(row) {
