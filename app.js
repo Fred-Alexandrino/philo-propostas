@@ -28,9 +28,91 @@ function getBackendUrl() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GERAR PROPOSTA
+// UNIDADES CONSUMIDORAS (geradora + beneficiárias)
 // ─────────────────────────────────────────────────────────────
 const MESES_LABEL = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+let contadorUnidades = 0;
+
+function criarBlocoUnidade(tipo) {
+  const idx = contadorUnidades++;
+  const isGeradora = tipo === "geradora";
+  const div = document.createElement("div");
+  div.className = "unidade-bloco";
+  div.dataset.unidadeId = idx;
+  div.dataset.tipo = tipo;
+  div.innerHTML = `
+    <div class="unidade-header">
+      <span class="tag ${tipo}">${isGeradora ? "Unidade Geradora" : "Unidade Beneficiária"}</span>
+      ${isGeradora ? "" : '<button type="button" class="remover">Remover</button>'}
+    </div>
+    <div class="grid">
+      <div class="field"><label>Identificação (opcional)</label><input class="uc-nome" placeholder="Ex: Apto 101"></div>
+      <div class="field"><label>Endereço da unidade (opcional)</label><input class="uc-endereco" placeholder="Rua, número, bairro"></div>
+    </div>
+    <div class="meses-grid">
+      ${MESES_LABEL.map(m => `<div class="field"><label>${m}</label><input type="number" class="uc-mes" value="0"></div>`).join("")}
+    </div>
+    <div class="field" style="margin-top:14px; max-width:260px;">
+      <label>Tarifa média (R$/kWh)</label>
+      <input type="number" step="0.0001" class="uc-tarifa" placeholder="Ex: 0.9246">
+    </div>
+  `;
+  if (!isGeradora) {
+    div.querySelector(".remover").onclick = () => div.remove();
+  }
+  return div;
+}
+
+function coletarUnidades() {
+  return Array.from(document.querySelectorAll(".unidade-bloco")).map(bloco => {
+    const consumoMeses = Array.from(bloco.querySelectorAll(".uc-mes")).map(el => parseFloat(el.value) || 0);
+    const consumoMedioMensal = consumoMeses.reduce((a, b) => a + b, 0) / 12;
+    return {
+      tipo: bloco.dataset.tipo,
+      nome: bloco.querySelector(".uc-nome").value.trim(),
+      endereco: bloco.querySelector(".uc-endereco").value.trim(),
+      consumoMedioMensal,
+      tarifa: parseFloat(bloco.querySelector(".uc-tarifa").value) || 0,
+    };
+  });
+}
+
+document.getElementById("unidades-container").appendChild(criarBlocoUnidade("geradora"));
+document.getElementById("btnAddUnidade").onclick = () => {
+  document.getElementById("unidades-container").appendChild(criarBlocoUnidade("beneficiaria"));
+};
+
+// ─────────────────────────────────────────────────────────────
+// CÁLCULO DA POTÊNCIA MÍNIMA (sob demanda — depende do HSP da cidade)
+// ─────────────────────────────────────────────────────────────
+document.getElementById("btnCalcularPotencia").onclick = async () => {
+  const box = document.getElementById("potenciaSugerida");
+  const cidade = document.getElementById("cidade").value.trim();
+  const uf = document.getElementById("uf").value.trim().toUpperCase();
+  if (!cidade || !uf) {
+    box.style.display = "block";
+    box.textContent = "Informe cidade e UF antes de calcular.";
+    return;
+  }
+  box.style.display = "block";
+  box.textContent = "Buscando irradiação solar (HSP) da cidade...";
+  try {
+    const { hspMensal } = await PhiloCalc.buscarHSPMensal(cidade, uf);
+    const unidades = coletarUnidades().map(u => ({ consumoMedioMensal: u.consumoMedioMensal, tarifa: u.tarifa }));
+    const dados = PhiloCalc.calcularDadosIniciais({
+      unidadesConsumidoras: unidades,
+      hspMensal,
+      potenciaPainelW: parseFloat(document.getElementById("potenciaPainel").value) || 550,
+    });
+    box.textContent = `Potência mínima necessária: ${dados.potenciaMinimaKwp.toFixed(2)} kWp `
+      + `(${dados.quantidadePaineis} painéis nessa potência de placa) — consumo total considerado: ${Math.round(dados.consumoTotal)} kWh/mês.`;
+    if (!document.getElementById("potenciaSistema").value) {
+      document.getElementById("potenciaSistema").placeholder = `Sugestão: ${dados.potenciaMinimaKwp.toFixed(2)} kWp`;
+    }
+  } catch (err) {
+    box.textContent = `Erro ao calcular: ${err.message}`;
+  }
+};
 
 document.getElementById("btnGerar").onclick = async () => {
   const status = document.getElementById("status");
@@ -51,9 +133,8 @@ document.getElementById("btnGerar").onclick = async () => {
     status.textContent = "Buscando irradiação solar (HSP) real da cidade...";
     const { hspMensal } = await PhiloCalc.buscarHSPMensal(cidade, uf);
 
-    const consumoMeses = Array.from(document.querySelectorAll(".mes")).map(el => parseFloat(el.value) || 0);
-    const consumoMedioMensal = consumoMeses.reduce((a, b) => a + b, 0) / 12;
-    const tarifa = parseFloat(document.getElementById("tarifa").value) || 0;
+    const unidades = coletarUnidades();
+    if (!unidades.length) throw new Error("Adicione ao menos a unidade geradora.");
     const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
     const potenciaSistemaInformada = parseFloat(document.getElementById("potenciaSistema").value);
     const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
@@ -61,7 +142,7 @@ document.getElementById("btnGerar").onclick = async () => {
 
     const inputs = {
       cidade, uf,
-      unidadesConsumidoras: [{ consumoMedioMensal, tarifa }],
+      unidadesConsumidoras: unidades.map(u => ({ consumoMedioMensal: u.consumoMedioMensal, tarifa: u.tarifa })),
       potenciaSistemaKwp: isNaN(potenciaSistemaInformada) ? undefined : potenciaSistemaInformada,
       potenciaPainelW,
       hspMensal,
@@ -80,7 +161,9 @@ document.getElementById("btnGerar").onclick = async () => {
     const payload = {
       action: "gerarProposta",
       nomeCliente: document.getElementById("nomeCliente").value.trim(),
+      enderecoCliente: document.getElementById("enderecoCliente").value.trim(),
       fornecedor: document.getElementById("fornecedor").value.trim(),
+      unidades: unidades.map(u => ({ tipo: u.tipo, nome: u.nome, endereco: u.endereco })),
       resumo,
     };
 
