@@ -28,9 +28,18 @@ const CONST = {
   DESCONTO_A_VISTA: 0.10,         // DRE!L2 = G4*0.9 → 10% de desconto à vista
   PARCELAS_PADRAO: 12,
 
-  // CUSTOS INDIRETOS (por kWp, salvo indicação contrária) — os diretos
-  // (mão de obra, material de instalação, imposto) agora são preenchidos
-  // manualmente por proposta na tela do painel.
+  // CUSTOS DIRETOS — valores sugeridos automaticamente (ajustáveis na tela):
+  MAO_DE_OBRA_POR_KWP: 350,        // R$/kWp — solicitado por Fred
+  IMPOSTO_INSTALACAO_PERC: 0.10,   // 10% em cima do valor final (sale price), calculado de forma fechada (ver sugerirCustosInstalacao)
+  // Material CA — tabela CUSTOS PROJETO!I4:L6, varia por tipo de telhado/local
+  CUSTOS_INSTALACAO: {
+    "telhado_fortaleza": { materialCAPorKwp: 220.00 },
+    "solo_fortaleza":     { materialCAPorKwp: 244.20 },
+    "telhado_outras":     { materialCAPorKwp: 123.67 },
+    "solo_outras":        { materialCAPorKwp: 441.31 },
+  },
+
+  // CUSTOS INDIRETOS (por kWp, salvo indicação contrária)
   INSTALACAO_TERCEIRIZADA_POR_KWP: 300,  // CUSTOS PROJETO!D31
   ART_PROJETO: 88.78,                     // CUSTOS PROJETO!D32 (valor fixo)
   VISITA_TECNICA_POR_KWP: 50,             // CUSTOS PROJETO!D33
@@ -162,24 +171,52 @@ function calcularCustos(inputs, dadosIniciais) {
   const kwp = dadosIniciais.potenciaSistemaKwp;
   const materiaisKit = inputs.valorMaterialFornecedor;                              // MATERIAL!G7
 
-  // Custos diretos — agora preenchidos manualmente por proposta (variam por
-  // fornecedor/região), em vez de estimados por kWp.
+  // Custos diretos — preenchidos na tela (com sugestão automática, ver sugerirCustosInstalacao)
   const maoDeObraInstalacao = inputs.maoDeObraInstalacao || 0;
   const materialInstalacao = inputs.materialInstalacao || 0;
   const impostoInstalacao = inputs.impostoInstalacao || 0;
   const custosDiretos = maoDeObraInstalacao + materialInstalacao + impostoInstalacao;
 
-  // Custos indiretos — continuam estimados por kWp (ART, visita técnica, terceirização)
-  const instalacaoTerceirizada = kwp * CONST.INSTALACAO_TERCEIRIZADA_POR_KWP;
-  const artProjeto = CONST.ART_PROJETO;
-  const visitaTecnica = kwp * CONST.VISITA_TECNICA_POR_KWP;
-  const engLaudo = inputs.engLaudo || 0;
-  const artCat = inputs.artCat || 0;
-  const custosIndiretos = instalacaoTerceirizada + artProjeto + visitaTecnica + engLaudo + artCat;
+  // Custos indiretos — continuam automáticos por kWp (ART, visita técnica, terceirização)
+  const custosIndiretos = calcularCustosIndiretos(kwp, inputs);
 
   const custosDiversos = custosDiretos + custosIndiretos;                           // CUSTOS PROJETO!C4
 
   return { materiaisKit, custosDiretos, custosIndiretos, custosDiversos };
+}
+
+function calcularCustosIndiretos(kwp, extras = {}) {
+  const instalacaoTerceirizada = kwp * CONST.INSTALACAO_TERCEIRIZADA_POR_KWP;
+  const artProjeto = CONST.ART_PROJETO;
+  const visitaTecnica = kwp * CONST.VISITA_TECNICA_POR_KWP;
+  const engLaudo = extras.engLaudo || 0;
+  const artCat = extras.artCat || 0;
+  return instalacaoTerceirizada + artProjeto + visitaTecnica + engLaudo + artCat;
+}
+
+/**
+ * Sugere valores de mão de obra, material CA e imposto para pré-preencher a
+ * tela (o usuário pode ajustar cada um depois):
+ *  - Mão de obra: R$ 350/kWp
+ *  - Material CA: tabela por tipo de telhado/local (mesma da planilha original)
+ *  - Imposto: 10% sobre o valor final de venda — como o valor final também
+ *    depende do imposto (ele entra no custo antes do BDI), a conta é resolvida
+ *    de forma fechada: receita = baseSemImposto / (1 - BDI - 10%)
+ */
+function sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao }) {
+  const kwp = potenciaSistemaKwp;
+  const cfg = CONST.CUSTOS_INSTALACAO[tipoInstalacao] || CONST.CUSTOS_INSTALACAO.telhado_outras;
+
+  const maoDeObraInstalacao = kwp * CONST.MAO_DE_OBRA_POR_KWP;
+  const materialInstalacao = kwp * cfg.materialCAPorKwp;
+  const custosIndiretos = calcularCustosIndiretos(kwp);
+
+  const baseSemImposto = (valorMaterialFornecedor || 0) + maoDeObraInstalacao + materialInstalacao + custosIndiretos;
+  const divisor = 1 - CONST.BDI - CONST.IMPOSTO_INSTALACAO_PERC;
+  const receitaEstimada = baseSemImposto / divisor;
+  const impostoInstalacao = CONST.IMPOSTO_INSTALACAO_PERC * receitaEstimada;
+
+  return { maoDeObraInstalacao, materialInstalacao, impostoInstalacao };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -312,6 +349,8 @@ const PhiloCalc = {
   buscarHSPMensal,
   calcularDadosIniciais,
   calcularCustos,
+  calcularCustosIndiretos,
+  sugerirCustosInstalacao,
   calcularDRE,
   calcularPayback,
   montarResumoProposta,
