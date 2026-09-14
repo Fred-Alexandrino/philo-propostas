@@ -91,6 +91,10 @@
     background: #14301f; border: 1px solid #1f5c38; color: var(--accent2);
     padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px;
   }
+  .potencia-resultante {
+    background: #241d0f; border: 1px solid #6b4f14; color: var(--accent);
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 14px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -143,13 +147,11 @@
       <h2>Sistema Fotovoltaico</h2>
       <div class="potencia-sugerida" id="potenciaSugerida" style="display:none;"></div>
       <div class="grid">
-        <div class="field">
-          <label>Potência do sistema (kWp) — deixe em branco para usar o mínimo calculado</label>
-          <input type="number" step="0.01" id="potenciaSistema" placeholder="Automático">
-        </div>
         <div class="field"><label>Potência da placa (Wp)</label><input type="number" id="potenciaPainel" placeholder="Ex: 710"></div>
+        <div class="field"><label>Quantidade de módulos</label><input type="number" id="quantidadeModulos" placeholder="Ex: 18"></div>
       </div>
       <button type="button" class="secundario" id="btnCalcularPotencia">Calcular potência mínima necessária</button>
+      <div class="potencia-resultante" id="potenciaResultante" style="display:none;"></div>
     </div>
 
     <div class="card">
