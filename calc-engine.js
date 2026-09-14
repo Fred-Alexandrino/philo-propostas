@@ -28,14 +28,9 @@ const CONST = {
   DESCONTO_A_VISTA: 0.10,         // DRE!L2 = G4*0.9 → 10% de desconto à vista
   PARCELAS_PADRAO: 12,
 
-  // CUSTOS DIRETOS E INDIRETOS (por kWp, salvo indicação contrária)
-  // Tabela CUSTOS PROJETO!I4:L6 — varia por tipo de instalação e localização
-  CUSTOS_INSTALACAO: {
-    "telhado_fortaleza": { geralMontagem: 39.82, materiaisFerramentas: 220.00 },
-    "solo_fortaleza":     { geralMontagem: 49.59, materiaisFerramentas: 244.20 },
-    "telhado_outras":     { geralMontagem: 79.73, materiaisFerramentas: 123.67 },
-    "solo_outras":        { geralMontagem: 79.73, materiaisFerramentas: 441.31 },
-  },
+  // CUSTOS INDIRETOS (por kWp, salvo indicação contrária) — os diretos
+  // (mão de obra, material de instalação, imposto) agora são preenchidos
+  // manualmente por proposta na tela do painel.
   INSTALACAO_TERCEIRIZADA_POR_KWP: 300,  // CUSTOS PROJETO!D31
   ART_PROJETO: 88.78,                     // CUSTOS PROJETO!D32 (valor fixo)
   VISITA_TECNICA_POR_KWP: 50,             // CUSTOS PROJETO!D33
@@ -158,23 +153,23 @@ function calcularDadosIniciais(inputs) {
 /**
  * @param {Object} inputs
  * @param {number} inputs.valorMaterialFornecedor  - valor total do kit (fornecedor)
- * @param {string} inputs.tipoInstalacao            - "telhado_fortaleza" | "solo_fortaleza" | "telhado_outras" | "solo_outras"
- * @param {number} [inputs.maoDeObraAdicional]       - custo extra de M.O., se houver (default 0)
+ * @param {number} inputs.maoDeObraInstalacao      - R$ — preenchido manualmente por proposta
+ * @param {number} inputs.materialInstalacao       - R$ — preenchido manualmente por proposta
+ * @param {number} inputs.impostoInstalacao        - R$ — preenchido manualmente por proposta
  * @param {Object} dadosIniciais - retorno de calcularDadosIniciais()
  */
 function calcularCustos(inputs, dadosIniciais) {
   const kwp = dadosIniciais.potenciaSistemaKwp;
-  const cfg = CONST.CUSTOS_INSTALACAO[inputs.tipoInstalacao] || CONST.CUSTOS_INSTALACAO.telhado_outras;
-
   const materiaisKit = inputs.valorMaterialFornecedor;                              // MATERIAL!G7
 
-  // Custos diretos — CUSTOS PROJETO!B13:F25
-  const geralMontagem = 0;                    // F15 na planilha-modelo vem zerado (ajuste manual se necessário)
-  const maoDeObra = inputs.maoDeObraAdicional || 0;
-  const materiaisFerramentas = kwp * cfg.materiaisFerramentas;
-  const custosDiretos = geralMontagem + maoDeObra + materiaisFerramentas;
+  // Custos diretos — agora preenchidos manualmente por proposta (variam por
+  // fornecedor/região), em vez de estimados por kWp.
+  const maoDeObraInstalacao = inputs.maoDeObraInstalacao || 0;
+  const materialInstalacao = inputs.materialInstalacao || 0;
+  const impostoInstalacao = inputs.impostoInstalacao || 0;
+  const custosDiretos = maoDeObraInstalacao + materialInstalacao + impostoInstalacao;
 
-  // Custos indiretos — CUSTOS PROJETO!B29:F35
+  // Custos indiretos — continuam estimados por kWp (ART, visita técnica, terceirização)
   const instalacaoTerceirizada = kwp * CONST.INSTALACAO_TERCEIRIZADA_POR_KWP;
   const artProjeto = CONST.ART_PROJETO;
   const visitaTecnica = kwp * CONST.VISITA_TECNICA_POR_KWP;
