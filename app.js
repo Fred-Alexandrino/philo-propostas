@@ -1,4 +1,44 @@
 // ─────────────────────────────────────────────────────────────
+// PWA — registro do service worker e botão de instalação
+// ─────────────────────────────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+}
+
+let promptInstalacaoAdiado = null;
+const btnInstalar = document.getElementById("btn-instalar");
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  promptInstalacaoAdiado = event;
+  btnInstalar.style.display = "inline-block"; // Chrome/Edge (desktop e Android)
+});
+
+btnInstalar.onclick = async () => {
+  if (!promptInstalacaoAdiado) return;
+  promptInstalacaoAdiado.prompt();
+  await promptInstalacaoAdiado.userChoice;
+  promptInstalacaoAdiado = null;
+  btnInstalar.style.display = "none";
+};
+
+window.addEventListener("appinstalled", () => {
+  btnInstalar.style.display = "none";
+});
+
+// iOS/Safari não dispara "beforeinstallprompt" — o usuário instala via
+// Compartilhar → Adicionar à Tela de Início. Mostramos essa dica uma vez.
+const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const jaInstalado = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+if (ehIOS && !jaInstalado) {
+  btnInstalar.style.display = "inline-block";
+  btnInstalar.textContent = "📲 Como instalar";
+  btnInstalar.onclick = () => {
+    alert('Para instalar no iPhone/iPad: toque no ícone de Compartilhar (□↑) na barra do Safari e depois em "Adicionar à Tela de Início".');
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
 // NAVEGAÇÃO ENTRE TELAS
 // ─────────────────────────────────────────────────────────────
 const telas = { nova: "tela-nova", historico: "tela-historico", config: "tela-config" };
