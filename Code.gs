@@ -4,15 +4,10 @@
  * Cole este código em: Extensões → Apps Script (dentro da planilha "Propostas Philo").
  *
  * CONFIGURAÇÃO NECESSÁRIA ANTES DE PUBLICAR:
- * 1. Crie uma aba chamada "Config" na planilha com:
- *      A1: TEMPLATE_DOC_ID   B1: <ID do Google Doc modelo da proposta>
- *      A2: PASTA_DRIVE_ID    B2: <ID de uma pasta no Drive para guardar os documentos gerados>
- * 2. Prepare o Google Doc modelo (veja instruções abaixo desta função) com marcadores
- *    {{TAG}} nos lugares onde hoje há valores fixos no Word original.
- * 3. Em Publicar → Implantar como app da web:
- *      - Executar como: Eu (sua conta)
- *      - Quem pode acessar: Qualquer pessoa
- * 4. Copie a URL gerada (.../exec) e cole no painel, na aba "Configuração".
+ * Nenhuma! Depois de colar este código e implantar como Web App, abra a URL
+ * gerada com "?action=setup" no final — isso cria sozinho a aba "Config" e o
+ * Google Doc modelo (com a identidade visual da Philo e os marcadores {{TAG}}).
+ * Os documentos gerados NÃO ficam salvos no Drive — você baixa e guarda onde quiser.
  *
  * MARCADORES ESPERADOS NO GOOGLE DOC MODELO (troque os valores do Word original por estes):
  *   {{LOCAL}} {{DATA}} {{CONSUMO_MEDIO}} {{TARIFA_MEDIA}} {{POTENCIA_SISTEMA}}
@@ -71,26 +66,18 @@ function autoconfigurar() {
   }
   const config = getConfigSafe(configSheet);
 
-  let pastaId = extrairIdDrive(config["PASTA_DRIVE_ID"]);
-  if (!pastaValida(pastaId)) {
-    const pasta = DriveApp.createFolder("Propostas Philo - Documentos");
-    pastaId = pasta.getId();
-  }
-
   let templateId = extrairIdDrive(config["TEMPLATE_DOC_ID"]);
   if (!documentoValido(templateId)) {
-    templateId = criarModeloProposta(DriveApp.getFolderById(pastaId));
+    templateId = criarModeloProposta();
   }
 
   configSheet.clear();
   configSheet.appendRow(["TEMPLATE_DOC_ID", templateId]);
-  configSheet.appendRow(["PASTA_DRIVE_ID", pastaId]);
 
   return {
     ok: true,
     mensagem: "Configuração concluída automaticamente.",
     templateDocUrl: `https://docs.google.com/document/d/${templateId}/edit`,
-    pastaUrl: `https://drive.google.com/drive/folders/${pastaId}`,
   };
 }
 
@@ -99,18 +86,10 @@ function autoconfigurar() {
 function extrairIdDrive(valor) {
   if (!valor) return null;
   const texto = String(valor).trim();
-  const matchPasta = texto.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-  if (matchPasta) return matchPasta[1];
   const matchDoc = texto.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (matchDoc) return matchDoc[1];
-  // Se não é uma URL reconhecida mas também não parece um ID válido (ex: texto de instrução), rejeita.
   if (/^[a-zA-Z0-9_-]{15,}$/.test(texto)) return texto;
   return null;
-}
-
-function pastaValida(id) {
-  if (!id) return false;
-  try { DriveApp.getFolderById(id); return true; } catch (err) { return false; }
 }
 
 function documentoValido(id) {
@@ -129,11 +108,8 @@ function getConfigSafe(sheet) {
 // Monta o Google Doc modelo do zero, replicando a estrutura da
 // "PROPOSTA COMERCIAL - MODELO.docx" com os marcadores {{TAG}} no
 // lugar dos valores, e a logo da Philo no topo.
-function criarModeloProposta(pasta) {
+function criarModeloProposta() {
   const doc = DocumentApp.create("Modelo Proposta Philo");
-  const arquivo = DriveApp.getFileById(doc.getId());
-  pasta.addFile(arquivo);
-  DriveApp.getRootFolder().removeFile(arquivo); // tira da raiz, deixa só na pasta
 
   const corpo = doc.getBody();
   corpo.setMarginTop(36).setMarginBottom(36);
@@ -257,7 +233,7 @@ function jsonOutput(obj) {
 
 function getConfig() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Config");
-  if (!sheet) throw new Error('Aba "Config" não encontrada na planilha. Crie uma aba chamada exatamente "Config" com TEMPLATE_DOC_ID e PASTA_DRIVE_ID.');
+  if (!sheet) throw new Error('Aba "Config" não encontrada na planilha. Abra a URL do Web App com ?action=setup para criar automaticamente.');
   const values = sheet.getDataRange().getValues();
   const config = {};
   values.forEach(row => { if (row[0]) config[row[0]] = row[1]; });
@@ -267,22 +243,15 @@ function getConfig() {
 function gerarProposta(body) {
   const config = getConfig();
   const templateId = config["TEMPLATE_DOC_ID"];
-  const pastaId = config["PASTA_DRIVE_ID"];
-  if (!templateId) throw new Error('Preencha TEMPLATE_DOC_ID na aba "Config" (ID do Google Doc modelo).');
+  if (!templateId) throw new Error('Preencha TEMPLATE_DOC_ID na aba "Config" (ou rode ?action=setup).');
 
   const r = body.resumo;
   const nomeArquivo = `Proposta - ${body.nomeCliente || "Cliente"} - ${r.local} - ${r.data}`;
 
-  // 1) Copia o template
-  let pasta;
-  try {
-    pasta = pastaId ? DriveApp.getFolderById(pastaId) : DriveApp.getRootFolder();
-  } catch (err) {
-    throw new Error(`PASTA_DRIVE_ID inválido na aba "Config" (${pastaId}). Verifique o ID da pasta no Drive.`);
-  }
+  // 1) Copia o template para uma cópia de trabalho temporária (será apagada no final)
   let copia;
   try {
-    copia = DriveApp.getFileById(templateId).makeCopy(nomeArquivo, pasta);
+    copia = DriveApp.getFileById(templateId).makeCopy(nomeArquivo);
   } catch (err) {
     throw new Error(`TEMPLATE_DOC_ID inválido na aba "Config" (${templateId}). Verifique o ID do Google Doc modelo.`);
   }
@@ -323,20 +292,19 @@ function gerarProposta(body) {
   Object.keys(substituicoes).forEach(tag => corpo.replaceText(tag, String(substituicoes[tag])));
   doc.saveAndClose();
 
-  // 2) Exporta como .docx
+  // 2) Exporta como .docx (base64, não fica salvo em lugar nenhum)
   const token = ScriptApp.getOAuthToken();
   const docxUrl = `https://docs.google.com/document/d/${copia.getId()}/export?format=docx`;
-  const docxBlob = UrlFetchApp.fetch(docxUrl, { headers: { Authorization: "Bearer " + token } })
-    .getBlob().setName(nomeArquivo + ".docx");
-  const arquivoDocx = pasta.createFile(docxBlob);
-  arquivoDocx.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const docxBase64 = UrlFetchApp.fetch(docxUrl, { headers: { Authorization: "Bearer " + token } })
+    .getBlob().getBytes();
 
-  // 3) Exporta como PDF
-  const pdfBlob = DriveApp.getFileById(copia.getId()).getAs("application/pdf").setName(nomeArquivo + ".pdf");
-  const arquivoPdf = pasta.createFile(pdfBlob);
-  arquivoPdf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // 3) Exporta como PDF (base64)
+  const pdfBase64 = DriveApp.getFileById(copia.getId()).getAs("application/pdf").getBytes();
 
-  // 4) Registra no histórico
+  // 4) Apaga a cópia de trabalho — nada fica salvo permanentemente no Drive
+  DriveApp.getFileById(copia.getId()).setTrashed(true);
+
+  // 5) Registra no histórico (só os números, não os arquivos — você baixa e guarda onde quiser)
   registrarHistorico({
     data: r.data,
     cliente: body.nomeCliente || "",
@@ -344,15 +312,14 @@ function gerarProposta(body) {
     potenciaKwp: r.potenciaSistemaKwp.toFixed(2),
     valorAVista: r.condicoesComerciais.aVista.toFixed(2),
     payback: r.payback,
-    linkDocx: arquivoDocx.getUrl(),
-    linkPdf: arquivoPdf.getUrl(),
     jsonCompleto: JSON.stringify(body),
   });
 
   return {
     ok: true,
-    linkDocx: arquivoDocx.getUrl(),
-    linkPdf: arquivoPdf.getUrl(),
+    nomeArquivo,
+    docxBase64: Utilities.base64Encode(docxBase64),
+    pdfBase64: Utilities.base64Encode(pdfBase64),
   };
 }
 
@@ -373,17 +340,17 @@ function registrarHistorico(row) {
   let sheet = ss.getSheetByName("Propostas");
   if (!sheet) {
     sheet = ss.insertSheet("Propostas");
-    sheet.appendRow(["Data", "Cliente", "Local", "Potência (kWp)", "Valor à Vista", "Payback", "Link Word", "Link PDF", "JSON"]);
+    sheet.appendRow(["Data", "Cliente", "Local", "Potência (kWp)", "Valor à Vista", "Payback", "JSON"]);
   }
-  sheet.appendRow([row.data, row.cliente, row.local, row.potenciaKwp, row.valorAVista, row.payback, row.linkDocx, row.linkPdf, row.jsonCompleto]);
+  sheet.appendRow([row.data, row.cliente, row.local, row.potenciaKwp, row.valorAVista, row.payback, row.jsonCompleto]);
 }
 
 function listarHistorico() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Propostas");
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
   return values.map(row => ({
     data: row[0], cliente: row[1], local: row[2], potenciaKwp: row[3],
-    valorAVista: row[4], payback: row[5], linkDocx: row[6], linkPdf: row[7],
+    valorAVista: row[4], payback: row[5],
   })).reverse();
 }
