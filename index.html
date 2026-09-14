@@ -99,6 +99,13 @@
   table.tabela-custos td { padding: 8px 0; border-bottom: 1px solid var(--border); }
   table.tabela-custos td:first-child { color: var(--muted); font-size: 13px; width: 60%; }
   table.tabela-custos input { width: 100%; }
+  .valor-final-box {
+    margin-top: 16px; padding: 16px; border-radius: 10px;
+    background: #0f2417; border: 1px solid #1f5c38; text-align: center;
+  }
+  .valor-final-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .valor-final-numero { font-size: 28px; font-weight: 700; color: var(--accent2); margin-top: 4px; }
+  .valor-final-kwp { font-size: 12px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -176,8 +183,17 @@
             <td>Imposto (10% sobre o valor final)</td>
             <td><input type="number" step="0.01" id="impostoInstalacao" placeholder="R$ 0,00"></td>
           </tr>
+          <tr>
+            <td>Margem de lucro (%)</td>
+            <td><input type="number" step="0.1" id="margemLucroPerc" value="20"></td>
+          </tr>
         </tbody>
       </table>
+      <div class="valor-final-box">
+        <div class="valor-final-label">Valor final da proposta</div>
+        <div class="valor-final-numero" id="valorFinalProposta">R$ 0,00</div>
+        <div class="valor-final-kwp" id="valorPorKwp">R$ 0,00 / kWp</div>
+      </div>
     </div>
 
     <div class="card">
