@@ -191,6 +191,7 @@ document.getElementById("btnSugerirCustos").onclick = () => {
   const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
   const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
   const tipoInstalacao = document.getElementById("tipoInstalacao").value;
+  const margemLucroPerc = (parseFloat(document.getElementById("margemLucroPerc").value) || 20) / 100;
   const potenciaSistemaKwp = (quantidadeModulos * potenciaPainelW) / 1000;
 
   if (!potenciaSistemaKwp) {
@@ -198,11 +199,38 @@ document.getElementById("btnSugerirCustos").onclick = () => {
     return;
   }
 
-  const sugestao = PhiloCalc.sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao });
+  const sugestao = PhiloCalc.sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao, margemLucroPerc });
   document.getElementById("maoDeObraInstalacao").value = sugestao.maoDeObraInstalacao.toFixed(2);
   document.getElementById("materialInstalacao").value = sugestao.materialInstalacao.toFixed(2);
   document.getElementById("impostoInstalacao").value = sugestao.impostoInstalacao.toFixed(2);
+  atualizarValorFinal();
 };
+
+// ─────────────────────────────────────────────────────────────
+// VALOR FINAL DA PROPOSTA (ao vivo) — kit + material CA + mão de
+// obra + imposto + margem de lucro
+// ─────────────────────────────────────────────────────────────
+function atualizarValorFinal() {
+  const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
+  const maoDeObraInstalacao = parseFloat(document.getElementById("maoDeObraInstalacao").value) || 0;
+  const materialInstalacao = parseFloat(document.getElementById("materialInstalacao").value) || 0;
+  const impostoInstalacao = parseFloat(document.getElementById("impostoInstalacao").value) || 0;
+  const margemLucroPerc = (parseFloat(document.getElementById("margemLucroPerc").value) || 0) / 100;
+  const quantidadeModulos = parseFloat(document.getElementById("quantidadeModulos").value) || 0;
+  const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
+  const potenciaSistemaKwp = (quantidadeModulos * potenciaPainelW) / 1000;
+
+  const custos = { materiaisKit: valorMaterialFornecedor, maoDeObraInstalacao, materialInstalacao, impostoInstalacao };
+  const dre = PhiloCalc.calcularDRE(custos, { margemLucroPerc });
+
+  document.getElementById("valorFinalProposta").textContent =
+    "R$ " + dre.valorVendaFinal.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+  document.getElementById("valorPorKwp").textContent = potenciaSistemaKwp
+    ? "R$ " + (dre.valorVendaFinal / potenciaSistemaKwp).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + " / kWp"
+    : "—";
+}
+["valorMaterial", "maoDeObraInstalacao", "materialInstalacao", "impostoInstalacao", "margemLucroPerc", "quantidadeModulos", "potenciaPainel"]
+  .forEach(id => document.getElementById(id).addEventListener("input", atualizarValorFinal));
 
 // ─────────────────────────────────────────────────────────────
 // DOWNLOAD DIRETO (base64 → Blob) — nada fica salvo no Drive,
@@ -263,7 +291,8 @@ document.getElementById("btnGerar").onclick = async () => {
     status.textContent = "Calculando dimensionamento, custos, DRE e payback...";
     const dadosIniciais = PhiloCalc.calcularDadosIniciais(inputs);
     const custos = PhiloCalc.calcularCustos(inputs, dadosIniciais);
-    const dre = PhiloCalc.calcularDRE(custos);
+    const margemLucroPerc = (parseFloat(document.getElementById("margemLucroPerc").value) || 20) / 100;
+    const dre = PhiloCalc.calcularDRE(custos, { margemLucroPerc });
     const payback = PhiloCalc.calcularPayback(dre, dadosIniciais);
     const resumo = PhiloCalc.montarResumoProposta({ inputs, dadosIniciais, custos, dre, payback });
 
