@@ -38,10 +38,65 @@ function doPost(e) {
     if (body.action === "gerarProposta") {
       return jsonOutput(gerarProposta(body));
     }
+    if (body.action === "atualizarCodigo") {
+      return jsonOutput(atualizarCodigo(body.novoCodigoGs, body.senha));
+    }
     return jsonOutput({ ok: false, erro: "Ação desconhecida." });
   } catch (err) {
     return jsonOutput({ ok: false, erro: err.message });
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTO-ATUALIZAÇÃO — permite que este script atualize seu próprio
+// código-fonte (o arquivo "Code.gs") via API do Apps Script, usando
+// a autorização que ele já tem da sua conta. Requer que a "Google
+// Apps Script API" esteja ativada em script.google.com/home/usersettings
+// e que o manifesto (appsscript.json) tenha o escopo script.projects.
+//
+// SENHA_ATUALIZACAO: defina uma senha simples aqui (troque o valor
+// abaixo) para evitar que qualquer pessoa que descubra a URL do Web
+// App consiga reescrever seu script.
+// ─────────────────────────────────────────────────────────────
+const SENHA_ATUALIZACAO = "TROQUE_ESTA_SENHA";
+
+function atualizarCodigo(novoCodigoGs, senha) {
+  if (senha !== SENHA_ATUALIZACAO) {
+    throw new Error("Senha de atualização incorreta.");
+  }
+  const scriptId = ScriptApp.getScriptId();
+  const token = ScriptApp.getOAuthToken();
+  const url = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+  const getResp = UrlFetchApp.fetch(url, {
+    headers: { Authorization: "Bearer " + token },
+    muteHttpExceptions: true,
+  });
+  if (getResp.getResponseCode() !== 200) {
+    throw new Error("Falha ao ler o projeto atual: " + getResp.getContentText());
+  }
+  const projeto = JSON.parse(getResp.getContentText());
+  const arquivos = projeto.files.map(f => {
+    if (f.name === "Code" && f.type === "SERVER_JS") {
+      return { name: f.name, type: f.type, source: novoCodigoGs };
+    }
+    return f;
+  });
+
+  const putResp = UrlFetchApp.fetch(url, {
+    method: "put",
+    headers: { Authorization: "Bearer " + token },
+    contentType: "application/json",
+    payload: JSON.stringify({ files: arquivos }),
+    muteHttpExceptions: true,
+  });
+
+  const sucesso = putResp.getResponseCode() === 200;
+  return {
+    ok: sucesso,
+    status: putResp.getResponseCode(),
+    detalhe: sucesso ? "Código atualizado. Publique uma nova versão da implantação para valer no Web App." : putResp.getContentText(),
+  };
 }
 
 function doGet(e) {
