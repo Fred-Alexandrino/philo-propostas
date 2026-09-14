@@ -71,14 +71,14 @@ function autoconfigurar() {
   }
   const config = getConfigSafe(configSheet);
 
-  let pastaId = config["PASTA_DRIVE_ID"];
-  if (!pastaId) {
+  let pastaId = extrairIdDrive(config["PASTA_DRIVE_ID"]);
+  if (!pastaValida(pastaId)) {
     const pasta = DriveApp.createFolder("Propostas Philo - Documentos");
     pastaId = pasta.getId();
   }
 
-  let templateId = config["TEMPLATE_DOC_ID"];
-  if (!templateId) {
+  let templateId = extrairIdDrive(config["TEMPLATE_DOC_ID"]);
+  if (!documentoValido(templateId)) {
     templateId = criarModeloProposta(DriveApp.getFolderById(pastaId));
   }
 
@@ -92,6 +92,30 @@ function autoconfigurar() {
     templateDocUrl: `https://docs.google.com/document/d/${templateId}/edit`,
     pastaUrl: `https://drive.google.com/drive/folders/${pastaId}`,
   };
+}
+
+// Aceita tanto um ID puro quanto um link completo do Drive/Docs colado por engano,
+// e extrai só o ID de dentro dele.
+function extrairIdDrive(valor) {
+  if (!valor) return null;
+  const texto = String(valor).trim();
+  const matchPasta = texto.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (matchPasta) return matchPasta[1];
+  const matchDoc = texto.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (matchDoc) return matchDoc[1];
+  // Se não é uma URL reconhecida mas também não parece um ID válido (ex: texto de instrução), rejeita.
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(texto)) return texto;
+  return null;
+}
+
+function pastaValida(id) {
+  if (!id) return false;
+  try { DriveApp.getFolderById(id); return true; } catch (err) { return false; }
+}
+
+function documentoValido(id) {
+  if (!id) return false;
+  try { DriveApp.getFileById(id); return true; } catch (err) { return false; }
 }
 
 function getConfigSafe(sheet) {
