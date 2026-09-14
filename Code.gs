@@ -3,22 +3,33 @@
  * =================================================
  * Cole este código em: Extensões → Apps Script (dentro da planilha "Propostas Philo").
  *
- * CONFIGURAÇÃO NECESSÁRIA ANTES DE PUBLICAR:
- * Nenhuma! Depois de colar este código e implantar como Web App, abra a URL
- * gerada com "?action=setup" no final — isso cria sozinho a aba "Config" e o
- * Google Doc modelo (com a identidade visual da Philo e os marcadores {{TAG}}).
- * Os documentos gerados NÃO ficam salvos no Drive — você baixa e guarda onde quiser.
+ * COMO FUNCIONA: o modelo é o SEU arquivo .docx de verdade (com marcadores
+ * {{TAG}} no lugar dos valores), não uma recriação. O Apps Script abre o
+ * .docx como um ZIP (Utilities.unzip), edita o texto interno do documento
+ * (word/document.xml) e monta um novo .docx (Utilities.zip) — sem depender
+ * do Google Docs para isso, então a formatação original fica 100% intacta.
  *
- * MARCADORES ESPERADOS NO GOOGLE DOC MODELO (troque os valores do Word original por estes):
- *   {{LOCAL}} {{DATA}} {{CONSUMO_MEDIO}} {{TARIFA_MEDIA}} {{POTENCIA_SISTEMA}}
- *   {{ESTIMATIVA_GERACAO}} {{QTD_PAINEIS}} {{POTENCIA_PAINEL}} {{AREA_NECESSARIA}}
+ * CONFIGURAÇÃO NECESSÁRIA ANTES DE PUBLICAR:
+ * 1. Ative o serviço avançado do Drive: no editor do Apps Script, no menu
+ *    lateral "Serviços" → "+" → adicione "Drive API" (é só usado para
+ *    gerar o PDF; sem isso o Word ainda funciona, mas o PDF não).
+ * 2. Faça upload do arquivo "Modelo_Proposta_SEM_GRAFICOS.docx" (ou a versão
+ *    mais atual do modelo com marcadores) para o seu Google Drive.
+ * 3. Crie uma aba chamada "Config" na planilha com:
+ *      A1: TEMPLATE_DOCX_ID   B1: <ID do arquivo .docx que você subiu>
+ *    (o ID é o trecho da URL do Drive entre /d/ e /view ou /edit)
+ * 4. Implantar → Nova implantação → App da Web → Executar como "Eu",
+ *    acesso "Qualquer pessoa".
+ *
+ * MARCADORES USADOS NO MODELO:
+ *   {{DATA}} {{LOCAL}} {{NOME_CLIENTE}} {{ENDERECO_CLIENTE}}
+ *   {{CONSUMO_MEDIO}} {{TARIFA_MEDIA}} {{POTENCIA_SISTEMA}} {{ESTIMATIVA_GERACAO}}
+ *   {{QTD_PAINEIS}} {{POTENCIA_PAINEL}} {{AREA_NECESSARIA}} {{FORNECEDOR}}
  *   {{VALOR_A_VISTA}} {{VALOR_PARCELADO_TOTAL}} {{VALOR_PARCELA}}
  *   {{VALOR_ENTRADA}} {{VALOR_ENTRADA_PARCELA}}
  *   {{ECONOMIA_MES}} {{ECONOMIA_ANO}} {{RETORNO_MES}} {{RETORNO_ANO}}
  *   {{PAYBACK}} {{PRODUCAO_ANUAL}} {{REAJUSTE_TARIFA}} {{DEGRADACAO_SISTEMA}}
- *   {{NOME_CLIENTE}} {{ENDERECO_CLIENTE}} {{FORNECEDOR}}
- *   {{UNIDADES_BENEFICIARIAS}} (opcional — só preencha esse marcador no modelo se o projeto
- *   for de geração compartilhada / autoconsumo remoto; fica vazio quando há só uma unidade)
+ *   {{UNIDADES_BENEFICIARIAS}}
  */
 
 function doPost(e) {
@@ -38,193 +49,10 @@ function doGet(e) {
     if (e.parameter.action === "historico") {
       return jsonOutput({ ok: true, propostas: listarHistorico() });
     }
-    if (e.parameter.action === "setup") {
-      return jsonOutput(autoconfigurar());
-    }
     return jsonOutput({ ok: false, erro: "Ação desconhecida." });
   } catch (err) {
     return jsonOutput({ ok: false, erro: err.message });
   }
-}
-
-// ─────────────────────────────────────────────────────────────
-// AUTOCONFIGURAÇÃO — cria a aba Config, a pasta no Drive e o
-// Google Doc modelo (já com a identidade visual da Philo e os
-// marcadores {{TAG}}) automaticamente. Rode uma vez abrindo, no
-// navegador, a URL do Web App + "?action=setup".
-// Rodar de novo não duplica nada que já esteja configurado.
-// ─────────────────────────────────────────────────────────────
-const LOGO_URL = "https://raw.githubusercontent.com/Fred-Alexandrino/philo-propostas/main/logo-doc.png";
-const VERDE_PHILO = "#1e8a4f";
-const GRAFITE_PHILO = "#3d3d3d";
-
-function autoconfigurar() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let configSheet = ss.getSheetByName("Config");
-  if (!configSheet) {
-    configSheet = ss.insertSheet("Config");
-  }
-  const config = getConfigSafe(configSheet);
-
-  let templateId = extrairIdDrive(config["TEMPLATE_DOC_ID"]);
-  if (!documentoValido(templateId)) {
-    templateId = criarModeloProposta();
-  }
-
-  configSheet.clear();
-  configSheet.appendRow(["TEMPLATE_DOC_ID", templateId]);
-
-  return {
-    ok: true,
-    mensagem: "Configuração concluída automaticamente.",
-    templateDocUrl: `https://docs.google.com/document/d/${templateId}/edit`,
-  };
-}
-
-// Aceita tanto um ID puro quanto um link completo do Drive/Docs colado por engano,
-// e extrai só o ID de dentro dele.
-function extrairIdDrive(valor) {
-  if (!valor) return null;
-  const texto = String(valor).trim();
-  const matchDoc = texto.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (matchDoc) return matchDoc[1];
-  if (/^[a-zA-Z0-9_-]{15,}$/.test(texto)) return texto;
-  return null;
-}
-
-function documentoValido(id) {
-  if (!id) return false;
-  try { DriveApp.getFileById(id); return true; } catch (err) { return false; }
-}
-
-function getConfigSafe(sheet) {
-  const config = {};
-  if (sheet.getLastRow() === 0) return config;
-  const values = sheet.getDataRange().getValues();
-  values.forEach(row => { if (row[0]) config[row[0]] = row[1]; });
-  return config;
-}
-
-// Monta o Google Doc modelo do zero, replicando a estrutura da
-// "PROPOSTA COMERCIAL - MODELO.docx" com os marcadores {{TAG}} no
-// lugar dos valores, e a logo da Philo no topo.
-function criarModeloProposta() {
-  const doc = DocumentApp.create("Modelo Proposta Philo");
-
-  const corpo = doc.getBody();
-  corpo.setMarginTop(36).setMarginBottom(36);
-
-  // Logo no topo
-  try {
-    const logoBlob = UrlFetchApp.fetch(LOGO_URL).getBlob();
-    const img = corpo.appendImage(logoBlob);
-    img.setWidth(180);
-    img.setHeight(180 * (img.getHeight() / img.getWidth()));
-  } catch (err) {
-    corpo.appendParagraph("PHILO SOLUÇÕES ENERGÉTICAS").setBold(true);
-  }
-
-  corpo.appendParagraph("");
-  addPar(corpo, "DATA: {{DATA}}");
-  addPar(corpo, "LOCAL: {{LOCAL}}");
-  addPar(corpo, "CLIENTE: {{NOME_CLIENTE}}");
-  addPar(corpo, "ENDEREÇO: {{ENDERECO_CLIENTE}}");
-  corpo.appendParagraph("");
-
-  addPar(corpo, "Os dados para elaboração da presente proposta têm como base o consumo de energia elétrica em kWh, dos últimos 12 meses.");
-  corpo.appendParagraph("");
-
-  addTitulo(corpo, "CONSUMO");
-  addTabela(corpo, [
-    ["CONSUMO MÉDIO", "{{CONSUMO_MEDIO}} kWh"],
-    ["VALOR DA TARIFA", "R$ {{TARIFA_MEDIA}}"],
-  ]);
-
-  addPar(corpo, "A potência do sistema de geração é calculada com base no consumo de energia e na irradiação solar do local.");
-  addTabela(corpo, [
-    ["POTÊNCIA DO SISTEMA", "{{POTENCIA_SISTEMA}} kWp"],
-    ["ESTIMATIVA MÉDIA DE GERAÇÃO (MÊS)", "{{ESTIMATIVA_GERACAO}} kWh"],
-  ]);
-
-  addTitulo(corpo, "PAINÉIS SOLARES");
-  addTabela(corpo, [
-    ["QUANTIDADE", "{{QTD_PAINEIS}}"],
-    ["POTÊNCIA PLACA", "{{POTENCIA_PAINEL}} Wp"],
-    ["NÍVEL DE QUALIDADE", "Tier 1 Bloomberg"],
-    ["TECNOLOGIA", "Monocristalino"],
-    ["ÁREA NECESSÁRIA", "{{AREA_NECESSARIA}} m²"],
-  ]);
-
-  addTitulo(corpo, "INVERSOR");
-  addTabela(corpo, [
-    ["QUANTIDADE", "1"],
-    ["FABRICANTE", "{{FORNECEDOR}}"],
-    ["MONITORAMENTO", "WIRELESS"],
-  ]);
-
-  addPar(corpo, "*As garantias informadas são de responsabilidade dos fabricantes de cada equipamento. Os equipamentos poderão sofrer alterações em comum acordo entre empresa e cliente.");
-
-  addTitulo(corpo, "CONDIÇÕES COMERCIAIS");
-  addTabela(corpo, [
-    ["À VISTA", "R$ {{VALOR_A_VISTA}}"],
-    ["TOTAL PARCELADO (12x)", "R$ {{VALOR_PARCELA}} — total R$ {{VALOR_PARCELADO_TOTAL}}"],
-    ["ENTRADA + PARCELADO", "Entrada R$ {{VALOR_ENTRADA}} + 12x R$ {{VALOR_ENTRADA_PARCELA}}"],
-  ]);
-  addPar(corpo, "*Esta proposta é válida por 5 dias úteis, ou enquanto durar o estoque.");
-
-  addTitulo(corpo, "ECONOMIA E RETORNO DO INVESTIMENTO");
-  addTabela(corpo, [
-    ["ECONOMIA MÉDIA MENSAL", "R$ {{ECONOMIA_MES}}"],
-    ["RETORNO SOBRE INVESTIMENTO (MÊS)", "{{RETORNO_MES}}"],
-    ["ECONOMIA NO ANO", "R$ {{ECONOMIA_ANO}}"],
-    ["RETORNO SOBRE INVESTIMENTO (ANO)", "{{RETORNO_ANO}}"],
-  ]);
-
-  addTitulo(corpo, "PREMISSAS");
-  addTabela(corpo, [
-    ["Produção de energia solar em kWh/ano", "{{PRODUCAO_ANUAL}}"],
-    ["Tarifa média de energia em R$/kWh", "{{TARIFA_MEDIA}}"],
-    ["Aumento anual (máximo) na tarifa de energia elétrica", "{{REAJUSTE_TARIFA}}"],
-    ["Decréscimo anual de eficiência no sistema", "{{DEGRADACAO_SISTEMA}}"],
-    ["TEMPO DE RETORNO DO INVESTIMENTO (PAY-BACK)", "{{PAYBACK}}"],
-  ]);
-
-  const beneficiarias = corpo.appendParagraph("Unidades beneficiárias: {{UNIDADES_BENEFICIARIAS}}");
-  beneficiarias.editAsText().setForegroundColor(GRAFITE_PHILO);
-
-  corpo.appendParagraph("");
-  corpo.appendParagraph("");
-  addPar(corpo, "____________________________________");
-  addPar(corpo, "CONTRATANTE");
-  corpo.appendParagraph("");
-  addPar(corpo, "____________________________________");
-  addPar(corpo, "CONTRATADA – PHILO SOLUÇÕES ENERGÉTICAS").setBold(true);
-  addPar(corpo, "FRED ALEXANDRINO – ENGENHEIRO ELETRICISTA");
-  addPar(corpo, "CREA-CE Nº 061835737-8");
-
-  doc.saveAndClose();
-  return doc.getId();
-}
-
-function addTitulo(corpo, texto) {
-  const p = corpo.appendParagraph(texto);
-  p.setBold(true);
-  p.editAsText().setForegroundColor(VERDE_PHILO);
-  p.setSpacingBefore(14);
-  return p;
-}
-
-function addPar(corpo, texto) {
-  return corpo.appendParagraph(texto);
-}
-
-function addTabela(corpo, linhas) {
-  const tabela = corpo.appendTable(linhas);
-  tabela.getRow(0); // no-op, só garante que existe ao menos 1 linha
-  for (let i = 0; i < linhas.length; i++) {
-    tabela.getCell(i, 0).editAsText().setBold(true);
-  }
-  return tabela;
 }
 
 function jsonOutput(obj) {
@@ -233,30 +61,44 @@ function jsonOutput(obj) {
 
 function getConfig() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Config");
-  if (!sheet) throw new Error('Aba "Config" não encontrada na planilha. Abra a URL do Web App com ?action=setup para criar automaticamente.');
+  if (!sheet) throw new Error('Aba "Config" não encontrada. Crie uma aba "Config" com TEMPLATE_DOCX_ID.');
   const values = sheet.getDataRange().getValues();
   const config = {};
   values.forEach(row => { if (row[0]) config[row[0]] = row[1]; });
   return config;
 }
 
+// Aceita tanto um ID puro quanto um link completo do Drive colado por engano.
+function extrairIdDrive(valor) {
+  if (!valor) return null;
+  const texto = String(valor).trim();
+  const match = texto.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(texto)) return texto;
+  return null;
+}
+
 function gerarProposta(body) {
   const config = getConfig();
-  const templateId = config["TEMPLATE_DOC_ID"];
-  if (!templateId) throw new Error('Preencha TEMPLATE_DOC_ID na aba "Config" (ou rode ?action=setup).');
+  const templateId = extrairIdDrive(config["TEMPLATE_DOCX_ID"]);
+  if (!templateId) throw new Error('Preencha TEMPLATE_DOCX_ID na aba "Config" com o ID do arquivo .docx no Drive.');
 
   const r = body.resumo;
   const nomeArquivo = `Proposta - ${body.nomeCliente || "Cliente"} - ${r.local} - ${r.data}`;
 
-  // 1) Copia o template para uma cópia de trabalho temporária (será apagada no final)
-  let copia;
+  // 1) Abre o .docx original como ZIP
+  let templateBlob;
   try {
-    copia = DriveApp.getFileById(templateId).makeCopy(nomeArquivo);
+    templateBlob = DriveApp.getFileById(templateId).getBlob();
   } catch (err) {
-    throw new Error(`TEMPLATE_DOC_ID inválido na aba "Config" (${templateId}). Verifique o ID do Google Doc modelo.`);
+    throw new Error(`TEMPLATE_DOCX_ID inválido (${templateId}). Verifique o ID do arquivo .docx no Drive.`);
   }
-  const doc = DocumentApp.openById(copia.getId());
-  const corpo = doc.getBody();
+  const arquivosZip = Utilities.unzip(templateBlob);
+
+  // 2) Encontra e edita o word/document.xml (onde fica todo o texto)
+  const idxDocXml = arquivosZip.findIndex(b => b.getName() === "word/document.xml");
+  if (idxDocXml === -1) throw new Error("Arquivo .docx inválido: word/document.xml não encontrado.");
+  let xml = arquivosZip[idxDocXml].getDataAsString("UTF-8");
 
   const fmt = (n) => Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtPerc = (n) => (Number(n) * 100).toFixed(1).replace(".", ",") + "%";
@@ -289,22 +131,36 @@ function gerarProposta(body) {
     "{{FORNECEDOR}}": body.fornecedor || "",
     "{{UNIDADES_BENEFICIARIAS}}": listarUnidadesBeneficiarias(body.unidades),
   };
-  Object.keys(substituicoes).forEach(tag => corpo.replaceText(tag, String(substituicoes[tag])));
-  doc.saveAndClose();
+  Object.keys(substituicoes).forEach(tag => {
+    // split/join evita problemas de caracteres especiais de regex no valor
+    xml = xml.split(tag).join(escaparXml(String(substituicoes[tag])));
+  });
 
-  // 2) Exporta como .docx (base64, não fica salvo em lugar nenhum)
-  const token = ScriptApp.getOAuthToken();
-  const docxUrl = `https://docs.google.com/document/d/${copia.getId()}/export?format=docx`;
-  const docxBase64 = UrlFetchApp.fetch(docxUrl, { headers: { Authorization: "Bearer " + token } })
-    .getBlob().getBytes();
+  // 3) Substitui o word/document.xml modificado de volta no pacote e remonta o .docx
+  arquivosZip[idxDocXml] = Utilities.newBlob(xml, "application/xml", "word/document.xml");
+  const novoDocxBlob = Utilities.zip(arquivosZip, nomeArquivo + ".docx")
+    .setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
-  // 3) Exporta como PDF (base64)
-  const pdfBase64 = DriveApp.getFileById(copia.getId()).getAs("application/pdf").getBytes();
+  // 4) Gera o PDF convertendo uma cópia temporária via Google Drive (removida no final)
+  let pdfBase64 = null;
+  let arquivoTempId = null;
+  try {
+    const arquivoTemp = Drive.Files.insert(
+      { title: nomeArquivo, mimeType: MimeType.GOOGLE_DOCS },
+      novoDocxBlob,
+      { convert: true }
+    );
+    arquivoTempId = arquivoTemp.id;
+    const pdfBlob = DriveApp.getFileById(arquivoTempId).getAs("application/pdf");
+    pdfBase64 = Utilities.base64Encode(pdfBlob.getBytes());
+  } catch (err) {
+    // Se a "Drive API" (serviço avançado) não estiver ativada, ainda entregamos o Word.
+    pdfBase64 = null;
+  } finally {
+    if (arquivoTempId) DriveApp.getFileById(arquivoTempId).setTrashed(true);
+  }
 
-  // 4) Apaga a cópia de trabalho — nada fica salvo permanentemente no Drive
-  DriveApp.getFileById(copia.getId()).setTrashed(true);
-
-  // 5) Registra no histórico (só os números, não os arquivos — você baixa e guarda onde quiser)
+  // 5) Registra no histórico (só os números — nenhum arquivo fica salvo)
   registrarHistorico({
     data: r.data,
     cliente: body.nomeCliente || "",
@@ -318,14 +174,23 @@ function gerarProposta(body) {
   return {
     ok: true,
     nomeArquivo,
-    docxBase64: Utilities.base64Encode(docxBase64),
-    pdfBase64: Utilities.base64Encode(pdfBase64),
+    docxBase64: Utilities.base64Encode(novoDocxBlob.getBytes()),
+    pdfBase64,
+    avisoPdf: pdfBase64 ? null : 'PDF não gerado — ative o serviço avançado "Drive API" no Apps Script (Serviços → + → Drive API) e tente de novo.',
   };
 }
 
+// Escapa caracteres especiais de XML nos valores inseridos (evita quebrar o documento
+// se algum nome de cliente tiver &, <, > etc.)
+function escaparXml(texto) {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // Se houver unidades beneficiárias (geração compartilhada/autoconsumo remoto),
-// monta uma lista de texto com nome + endereço de cada uma, para uso opcional
-// no marcador {{UNIDADES_BENEFICIARIAS}} do modelo.
+// monta uma lista de texto com nome + endereço de cada uma.
 function listarUnidadesBeneficiarias(unidades) {
   if (!unidades || !unidades.length) return "";
   const beneficiarias = unidades.filter(u => u.tipo === "beneficiaria");
