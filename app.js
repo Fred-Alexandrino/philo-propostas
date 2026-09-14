@@ -181,6 +181,21 @@ function atualizarPotenciaResultante() {
 document.getElementById("quantidadeModulos").addEventListener("input", atualizarPotenciaResultante);
 document.getElementById("potenciaPainel").addEventListener("input", atualizarPotenciaResultante);
 
+// ─────────────────────────────────────────────────────────────
+// DOWNLOAD DIRETO (base64 → Blob) — nada fica salvo no Drive,
+// o navegador baixa o arquivo na hora e você escolhe onde salvar.
+// ─────────────────────────────────────────────────────────────
+function prepararDownload(elementoLink, base64, nomeArquivo, mimeType) {
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: mimeType });
+  if (elementoLink.dataset.blobUrl) URL.revokeObjectURL(elementoLink.dataset.blobUrl);
+  const url = URL.createObjectURL(blob);
+  elementoLink.href = url;
+  elementoLink.download = nomeArquivo;
+  elementoLink.dataset.blobUrl = url;
+  elementoLink.removeAttribute("target"); // download não deve abrir em nova aba
+}
+
 document.getElementById("btnGerar").onclick = async () => {
   const status = document.getElementById("status");
   const btn = document.getElementById("btnGerar");
@@ -246,10 +261,11 @@ document.getElementById("btnGerar").onclick = async () => {
     document.getElementById("r-potencia").textContent = resumo.potenciaSistemaKwp.toFixed(2);
     document.getElementById("r-avista").textContent = "R$ " + resumo.condicoesComerciais.aVista.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     document.getElementById("r-payback").textContent = resumo.payback;
-    document.getElementById("link-docx").href = data.linkDocx;
-    document.getElementById("link-pdf").href = data.linkPdf;
+    prepararDownload(document.getElementById("link-docx"), data.docxBase64, data.nomeArquivo + ".docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    prepararDownload(document.getElementById("link-pdf"), data.pdfBase64, data.nomeArquivo + ".pdf", "application/pdf");
     document.getElementById("resultado").style.display = "block";
-    status.textContent = "Proposta gerada com sucesso.";
+    status.textContent = "Proposta gerada com sucesso. Clique para baixar os arquivos.";
   } catch (err) {
     status.innerHTML = `<span class="erro">Erro: ${err.message}</span>`;
   } finally {
@@ -264,16 +280,16 @@ async function carregarHistorico() {
   const tbody = document.getElementById("tabela-historico");
   const backendUrl = getBackendUrl();
   if (!backendUrl) {
-    tbody.innerHTML = '<tr><td colspan="7" class="erro">Configure a URL do Apps Script primeiro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="erro">Configure a URL do Apps Script primeiro.</td></tr>';
     return;
   }
-  tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">Carregando...</td></tr>';
   try {
     const resp = await fetch(`${backendUrl}?action=historico`);
     const data = await resp.json();
     if (!data.ok) throw new Error(data.erro);
     if (!data.propostas.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">Nenhuma proposta gerada ainda.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">Nenhuma proposta gerada ainda.</td></tr>';
       return;
     }
     tbody.innerHTML = data.propostas.map(p => `
@@ -284,10 +300,9 @@ async function carregarHistorico() {
         <td>${p.potenciaKwp}</td>
         <td>R$ ${Number(p.valorAVista).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
         <td>${p.payback}</td>
-        <td><a href="${p.linkPdf}" target="_blank" style="color:var(--accent)">PDF</a></td>
       </tr>
     `).join("");
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="erro">Erro ao carregar: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="erro">Erro ao carregar: ${err.message}</td></tr>`;
   }
 }
