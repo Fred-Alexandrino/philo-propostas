@@ -95,6 +95,10 @@
     background: #241d0f; border: 1px solid #6b4f14; color: var(--accent);
     padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 14px; font-weight: 600;
   }
+  table.tabela-custos { width: 100%; border-collapse: collapse; }
+  table.tabela-custos td { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  table.tabela-custos td:first-child { color: var(--muted); font-size: 13px; width: 60%; }
+  table.tabela-custos input { width: 100%; }
 </style>
 </head>
 <body>
@@ -120,15 +124,6 @@
         <div class="field"><label>Endereço do cliente (opcional)</label><input id="enderecoCliente" placeholder="Rua, número, bairro"></div>
         <div class="field"><label>Cidade</label><input id="cidade" placeholder="Ex: São Gonçalo do Amarante"></div>
         <div class="field"><label>UF</label><input id="uf" placeholder="Ex: CE" maxlength="2"></div>
-        <div class="field">
-          <label>Tipo de instalação</label>
-          <select id="tipoInstalacao">
-            <option value="telhado_fortaleza">Telhado — Fortaleza</option>
-            <option value="solo_fortaleza">Solo — Fortaleza</option>
-            <option value="telhado_outras">Telhado — Outras cidades</option>
-            <option value="solo_outras">Solo — Outras cidades</option>
-          </select>
-        </div>
       </div>
     </div>
 
@@ -152,6 +147,27 @@
       </div>
       <button type="button" class="secundario" id="btnCalcularPotencia">Calcular potência mínima necessária</button>
       <div class="potencia-resultante" id="potenciaResultante" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Custos de Instalação</h2>
+      <p style="color:var(--muted); font-size:13px; margin-top:-8px;">Preencha os valores reais dessa proposta (variam por fornecedor/região).</p>
+      <table class="tabela-custos">
+        <tbody>
+          <tr>
+            <td>Mão de obra de instalação</td>
+            <td><input type="number" step="0.01" id="maoDeObraInstalacao" placeholder="R$ 0,00"></td>
+          </tr>
+          <tr>
+            <td>Material de instalação</td>
+            <td><input type="number" step="0.01" id="materialInstalacao" placeholder="R$ 0,00"></td>
+          </tr>
+          <tr>
+            <td>Imposto</td>
+            <td><input type="number" step="0.01" id="impostoInstalacao" placeholder="R$ 0,00"></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="card">
