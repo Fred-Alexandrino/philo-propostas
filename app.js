@@ -184,6 +184,27 @@ document.getElementById("quantidadeModulos").addEventListener("input", atualizar
 document.getElementById("potenciaPainel").addEventListener("input", atualizarPotenciaResultante);
 
 // ─────────────────────────────────────────────────────────────
+// SUGESTÃO AUTOMÁTICA DE CUSTOS (mão de obra, material CA, imposto)
+// ─────────────────────────────────────────────────────────────
+document.getElementById("btnSugerirCustos").onclick = () => {
+  const quantidadeModulos = parseFloat(document.getElementById("quantidadeModulos").value) || 0;
+  const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
+  const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
+  const tipoInstalacao = document.getElementById("tipoInstalacao").value;
+  const potenciaSistemaKwp = (quantidadeModulos * potenciaPainelW) / 1000;
+
+  if (!potenciaSistemaKwp) {
+    alert("Informe a quantidade de módulos e a potência da placa antes de sugerir os custos.");
+    return;
+  }
+
+  const sugestao = PhiloCalc.sugerirCustosInstalacao({ potenciaSistemaKwp, valorMaterialFornecedor, tipoInstalacao });
+  document.getElementById("maoDeObraInstalacao").value = sugestao.maoDeObraInstalacao.toFixed(2);
+  document.getElementById("materialInstalacao").value = sugestao.materialInstalacao.toFixed(2);
+  document.getElementById("impostoInstalacao").value = sugestao.impostoInstalacao.toFixed(2);
+};
+
+// ─────────────────────────────────────────────────────────────
 // DOWNLOAD DIRETO (base64 → Blob) — nada fica salvo no Drive,
 // o navegador baixa o arquivo na hora e você escolhe onde salvar.
 // ─────────────────────────────────────────────────────────────
