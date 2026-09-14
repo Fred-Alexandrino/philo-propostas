@@ -55,6 +55,7 @@ function jsonOutput(obj) {
 
 function getConfig() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Config");
+  if (!sheet) throw new Error('Aba "Config" não encontrada na planilha. Crie uma aba chamada exatamente "Config" com TEMPLATE_DOC_ID e PASTA_DRIVE_ID.');
   const values = sheet.getDataRange().getValues();
   const config = {};
   values.forEach(row => { if (row[0]) config[row[0]] = row[1]; });
@@ -65,14 +66,24 @@ function gerarProposta(body) {
   const config = getConfig();
   const templateId = config["TEMPLATE_DOC_ID"];
   const pastaId = config["PASTA_DRIVE_ID"];
-  if (!templateId) throw new Error('Configure TEMPLATE_DOC_ID na aba "Config".');
+  if (!templateId) throw new Error('Preencha TEMPLATE_DOC_ID na aba "Config" (ID do Google Doc modelo).');
 
   const r = body.resumo;
   const nomeArquivo = `Proposta - ${body.nomeCliente || "Cliente"} - ${r.local} - ${r.data}`;
 
   // 1) Copia o template
-  const pasta = pastaId ? DriveApp.getFolderById(pastaId) : DriveApp.getRootFolder();
-  const copia = DriveApp.getFileById(templateId).makeCopy(nomeArquivo, pasta);
+  let pasta;
+  try {
+    pasta = pastaId ? DriveApp.getFolderById(pastaId) : DriveApp.getRootFolder();
+  } catch (err) {
+    throw new Error(`PASTA_DRIVE_ID inválido na aba "Config" (${pastaId}). Verifique o ID da pasta no Drive.`);
+  }
+  let copia;
+  try {
+    copia = DriveApp.getFileById(templateId).makeCopy(nomeArquivo, pasta);
+  } catch (err) {
+    throw new Error(`TEMPLATE_DOC_ID inválido na aba "Config" (${templateId}). Verifique o ID do Google Doc modelo.`);
+  }
   const doc = DocumentApp.openById(copia.getId());
   const corpo = doc.getBody();
 
