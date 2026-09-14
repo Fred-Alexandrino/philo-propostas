@@ -1,4 +1,4 @@
-const CACHE_NOME = "philo-propostas-v1";
+const CACHE_NOME = "philo-propostas-v2";
 const ARQUIVOS_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const ARQUIVOS_SHELL = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
+  "./logo-header.png",
 ];
 
 self.addEventListener("install", (event) => {
