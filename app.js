@@ -139,20 +139,47 @@ document.getElementById("btnCalcularPotencia").onclick = async () => {
   try {
     const { hspMensal } = await PhiloCalc.buscarHSPMensal(cidade, uf);
     const unidades = coletarUnidades().map(u => ({ consumoMedioMensal: u.consumoMedioMensal, tarifa: u.tarifa }));
+    const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
     const dados = PhiloCalc.calcularDadosIniciais({
       unidadesConsumidoras: unidades,
       hspMensal,
-      potenciaPainelW: parseFloat(document.getElementById("potenciaPainel").value) || 550,
+      potenciaPainelW: potenciaPainelW || undefined,
     });
-    box.textContent = `Potência mínima necessária: ${dados.potenciaMinimaKwp.toFixed(2)} kWp `
-      + `(${dados.quantidadePaineis} painéis nessa potência de placa) — consumo total considerado: ${Math.round(dados.consumoTotal)} kWh/mês.`;
-    if (!document.getElementById("potenciaSistema").value) {
-      document.getElementById("potenciaSistema").placeholder = `Sugestão: ${dados.potenciaMinimaKwp.toFixed(2)} kWp`;
+    let texto = `Potência mínima necessária para atender o consumo: <strong>${dados.potenciaMinimaKwp.toFixed(2)} kWp</strong> `
+      + `(consumo total considerado: ${Math.round(dados.consumoTotal)} kWh/mês).`;
+    if (dados.quantidadePaineisSugerida) {
+      const kwpResultante = (dados.quantidadePaineisSugerida * potenciaPainelW) / 1000;
+      texto += ` Com placas de ${potenciaPainelW}Wp, seriam necessários pelo menos `
+        + `<strong>${dados.quantidadePaineisSugerida} módulos</strong> (${kwpResultante.toFixed(2)} kWp instalados, `
+        + `já que não dá pra fracionar um painel).`;
+      if (!document.getElementById("quantidadeModulos").value) {
+        document.getElementById("quantidadeModulos").value = dados.quantidadePaineisSugerida;
+        atualizarPotenciaResultante();
+      }
+    } else {
+      texto += " Informe a potência da placa para ver a quantidade sugerida de módulos.";
     }
+    box.innerHTML = texto;
   } catch (err) {
     box.textContent = `Erro ao calcular: ${err.message}`;
   }
 };
+
+// Potência do sistema é sempre uma consequência de quantidade × potência do módulo
+function atualizarPotenciaResultante() {
+  const box = document.getElementById("potenciaResultante");
+  const qtd = parseFloat(document.getElementById("quantidadeModulos").value) || 0;
+  const painelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
+  if (qtd && painelW) {
+    const kwp = (qtd * painelW) / 1000;
+    box.style.display = "block";
+    box.textContent = `Potência do sistema: ${kwp.toFixed(2)} kWp (${qtd} módulos × ${painelW}Wp)`;
+  } else {
+    box.style.display = "none";
+  }
+}
+document.getElementById("quantidadeModulos").addEventListener("input", atualizarPotenciaResultante);
+document.getElementById("potenciaPainel").addEventListener("input", atualizarPotenciaResultante);
 
 document.getElementById("btnGerar").onclick = async () => {
   const status = document.getElementById("status");
@@ -176,14 +203,15 @@ document.getElementById("btnGerar").onclick = async () => {
     const unidades = coletarUnidades();
     if (!unidades.length) throw new Error("Adicione ao menos a unidade geradora.");
     const potenciaPainelW = parseFloat(document.getElementById("potenciaPainel").value) || 0;
-    const potenciaSistemaInformada = parseFloat(document.getElementById("potenciaSistema").value);
+    const quantidadeModulos = parseFloat(document.getElementById("quantidadeModulos").value) || 0;
+    if (!potenciaPainelW || !quantidadeModulos) throw new Error("Informe a potência da placa e a quantidade de módulos.");
     const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
     const tipoInstalacao = document.getElementById("tipoInstalacao").value;
 
     const inputs = {
       cidade, uf,
       unidadesConsumidoras: unidades.map(u => ({ consumoMedioMensal: u.consumoMedioMensal, tarifa: u.tarifa })),
-      potenciaSistemaKwp: isNaN(potenciaSistemaInformada) ? undefined : potenciaSistemaInformada,
+      quantidadeModulos,
       potenciaPainelW,
       hspMensal,
       valorMaterialFornecedor,
