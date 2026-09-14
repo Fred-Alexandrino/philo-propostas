@@ -1,4 +1,4 @@
-const CACHE_NOME = "philo-propostas-v2";
+const CACHE_NOME = "philo-propostas-v3";
 const ARQUIVOS_SHELL = [
   "./",
   "./index.html",
