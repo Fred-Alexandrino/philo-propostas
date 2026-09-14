@@ -2,7 +2,9 @@
 // PWA — registro do service worker e botão de instalação
 // ─────────────────────────────────────────────────────────────
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then((reg) => reg.update());
+  });
 }
 
 let promptInstalacaoAdiado = null;
@@ -221,7 +223,9 @@ document.getElementById("btnGerar").onclick = async () => {
     const quantidadeModulos = parseFloat(document.getElementById("quantidadeModulos").value) || 0;
     if (!potenciaPainelW || !quantidadeModulos) throw new Error("Informe a potência da placa e a quantidade de módulos.");
     const valorMaterialFornecedor = parseFloat(document.getElementById("valorMaterial").value) || 0;
-    const tipoInstalacao = document.getElementById("tipoInstalacao").value;
+    const maoDeObraInstalacao = parseFloat(document.getElementById("maoDeObraInstalacao").value) || 0;
+    const materialInstalacao = parseFloat(document.getElementById("materialInstalacao").value) || 0;
+    const impostoInstalacao = parseFloat(document.getElementById("impostoInstalacao").value) || 0;
 
     const inputs = {
       cidade, uf,
@@ -230,7 +234,9 @@ document.getElementById("btnGerar").onclick = async () => {
       potenciaPainelW,
       hspMensal,
       valorMaterialFornecedor,
-      tipoInstalacao,
+      maoDeObraInstalacao,
+      materialInstalacao,
+      impostoInstalacao,
     };
 
     status.textContent = "Calculando dimensionamento, custos, DRE e payback...";
