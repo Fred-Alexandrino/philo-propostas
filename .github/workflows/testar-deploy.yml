@@ -1,0 +1,46 @@
+name: Testar implantacao do Apps Script (uso unico)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testar GET historico e POST atualizarCodigo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          {
+            echo "=== GET action=historico ==="
+            curl -s -L -w "\nHTTP_STATUS:%{http_code}\n" \
+              "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec?action=historico"
+            echo ""
+            echo "=== POST action=atualizarCodigo ==="
+            jq -n --arg action "atualizarCodigo" --rawfile codigo Code.gs --arg senha "TROQUE_ESTA_SENHA" \
+              '{action:$action, novoCodigoGs:$codigo, senha:$senha}' > /tmp/payload.json
+            curl -s -L -w "\nHTTP_STATUS:%{http_code}\n" -X POST \
+              "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" \
+              -H "Content-Type: text/plain;charset=utf-8" \
+              --data @/tmp/payload.json
+          } > /tmp/resultado_teste.txt 2>&1
+
+          cat /tmp/resultado_teste.txt
+
+          B64=$(base64 -w0 /tmp/resultado_teste.txt)
+          SHA=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/contents/resultado_teste.txt" | jq -r '.sha // empty')
+          if [ -n "$SHA" ]; then
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_teste.txt" \
+              -d "{\"message\":\"resultado teste\",\"content\":\"$B64\",\"sha\":\"$SHA\",\"branch\":\"main\"}" \
+              -o /dev/null -w "PUT status: %{http_code}\n"
+          else
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_teste.txt" \
+              -d "{\"message\":\"resultado teste\",\"content\":\"$B64\",\"branch\":\"main\"}" \
+              -o /dev/null -w "PUT status: %{http_code}\n"
+          fi
