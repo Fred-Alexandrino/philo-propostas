@@ -1,26 +1,42 @@
 name: Atualizar Code.gs no Apps Script (uso unico)
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   atualizar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Enviar Code.gs para o Apps Script e salvar resultado
+      - name: Enviar Code.gs para o Apps Script e salvar resultado via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -e
           jq -n --arg action "atualizarCodigo" --rawfile codigo Code.gs --arg senha "TROQUE_ESTA_SENHA" \
             '{action:$action, novoCodigoGs:$codigo, senha:$senha}' > /tmp/payload.json
+
           RESP=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
             "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" \
             -H "Content-Type: text/plain;charset=utf-8" \
             --data @/tmp/payload.json)
+
+          echo "$RESP" > /tmp/resultado_atualizacao.json
           echo "$RESP"
-          echo "$RESP" > resultado_atualizacao.json
-      - name: Commitar resultado
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add resultado_atualizacao.json
-          git commit -m "Resultado da chamada de auto-atualizacao" || echo "nada para commitar"
-          git push
+
+          B64=$(base64 -w0 /tmp/resultado_atualizacao.json)
+          SHA=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/contents/resultado_atualizacao.json" | jq -r '.sha // empty')
+
+          if [ -n "$SHA" ]; then
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_atualizacao.json" \
+              -d "{\"message\":\"resultado atualizacao\",\"content\":\"$B64\",\"sha\":\"$SHA\",\"branch\":\"main\"}" \
+              -o /dev/null -w "PUT status: %{http_code}\n"
+          else
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_atualizacao.json" \
+              -d "{\"message\":\"resultado atualizacao\",\"content\":\"$B64\",\"branch\":\"main\"}" \
+              -o /dev/null -w "PUT status: %{http_code}\n"
+          fi
