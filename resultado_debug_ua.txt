@@ -1,0 +1,23 @@
+=== POST com User-Agent de navegador, sem -L ===
+HTTP/2 302 
+content-type: application/binary
+access-control-allow-origin: *
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+pragma: no-cache
+expires: Mon, 01 Jan 1990 00:00:00 GMT
+date: Tue, 15 Sep 2026 19:08:28 GMT
+location: https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnScVqdYSLlr71rZk65K0T7gjK2azrOE-MMKV2evmfykt-2Sq_uy5E7Fakwr34-y3Z2LBVj2ewyVtCYA0y8rDdINbfnsMhuVANPCryJhMiLOLav5qWmD3AzCTqgrzpV0Dw6Gf5kiHJUSzJKLLmB5o3sIZP9NoDuxusSq60JoTZ0LkErGMSL0UuONMtUYceCnA6I4XWlJHlgumzrT8G_edGv2GPElpvrVxZKw77iwlZW7pjDIYWKURawgi1xm4Cw1cct1_cNE-twsOA9YjV_jEfRuKkD6rA&lib=MEpIBzzvsCFOpYLRsQM5Y9LjQiM8jbU1f
+content-security-policy: script-src 'report-sample' 'nonce-0GoVx-Wllxnd816rRIkLkg' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:;object-src 'none';base-uri 'self';report-uri /cspreport
+x-frame-options: SAMEORIGIN
+server: ESF
+content-length: 0
+x-xss-protection: 0
+x-content-type-options: nosniff
+alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+
+--- headers acima, corpo abaixo ---
+
+=== Agora seguindo o redirect manualmente com mesmo UA ===
+LOC=https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTeFAAR3dDWzmdfyFMGItj3Ixn5YANdzcGJ2q7SvGdyLaPRgHlzB30VI-VCB4lTgGqGpdZr8flj5yGtzKXbDdY7UC_bsO-40oekE-jwIac7pbp7Uhn-1ZChMPMnsWyb01c7fOwZr1StAuh6fHG-uhj-CBOttLX2xuR8oqHgj3fjwFd3Q0vTYYWxpDWs4153brmUQl_PagJCBoT3Dqto_yViXUgE0C_wM-TyEqzCXQbZguKA3E7uZw9Y9q9emsa92aqiFFQH6NMfgNFDM3zmS3T2KODPtQ&lib=MEpIBzzvsCFOpYLRsQM5Y9LjQiM8jbU1f
+{"ok":false,"erro":"Ação desconhecida."}
+HTTP_STATUS:200
