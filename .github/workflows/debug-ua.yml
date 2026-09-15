@@ -1,0 +1,47 @@
+name: Debug User-Agent no Apps Script (uso unico)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testar com User-Agent de navegador
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+          {
+            echo '{"action":"foobar","senha":"x"}' > /tmp/small.json
+            echo "=== POST com User-Agent de navegador, sem -L ==="
+            curl -s -D - -o /tmp/body1.txt -X POST \
+              -A "$UA" \
+              -H "Content-Type: text/plain;charset=utf-8" \
+              --data @/tmp/small.json \
+              "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec"
+            echo "--- headers acima, corpo abaixo ---"
+            cat /tmp/body1.txt
+            echo ""
+            echo "=== Agora seguindo o redirect manualmente com mesmo UA ==="
+            LOC=$(grep -i '^location:' /tmp/body1.txt 2>/dev/null | sed 's/location: //I' | tr -d '\r')
+            if [ -z "$LOC" ]; then
+              LOC=$(curl -s -D - -o /dev/null -X POST -A "$UA" -H "Content-Type: text/plain;charset=utf-8" --data @/tmp/small.json "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" | grep -i '^location:' | sed 's/location: //I' | tr -d '\r')
+            fi
+            echo "LOC=$LOC"
+            curl -s -A "$UA" -w "\nHTTP_STATUS:%{http_code}\n" "$LOC"
+          } > /tmp/debug_ua.txt 2>&1
+
+          cat /tmp/debug_ua.txt
+          B64=$(base64 -w0 /tmp/debug_ua.txt)
+          SHA=$(curl -s -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$REPO/contents/resultado_debug_ua.txt" | jq -r '.sha // empty')
+          if [ -n "$SHA" ]; then
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$REPO/contents/resultado_debug_ua.txt" \
+              -d "{\"message\":\"debug ua\",\"content\":\"$B64\",\"sha\":\"$SHA\",\"branch\":\"main\"}" -o /dev/null -w "PUT: %{http_code}\n"
+          else
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$REPO/contents/resultado_debug_ua.txt" \
+              -d "{\"message\":\"debug ua\",\"content\":\"$B64\",\"branch\":\"main\"}" -o /dev/null -w "PUT: %{http_code}\n"
+          fi
