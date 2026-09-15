@@ -1,0 +1,47 @@
+name: Debug do POST no Apps Script (uso unico)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Debug detalhado do POST
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          {
+            echo "=== Payload pequeno de teste (sem novoCodigoGs grande) ==="
+            echo '{"action":"foobar","senha":"x"}' > /tmp/small.json
+            echo "--- sem -L, ver headers do primeiro salto ---"
+            curl -s -D - -o /tmp/body1.txt -X POST \
+              "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" \
+              -H "Content-Type: text/plain;charset=utf-8" \
+              --data @/tmp/small.json
+            echo "--- corpo do primeiro salto ---"
+            cat /tmp/body1.txt
+            echo ""
+            echo "--- agora com -L --post302 --post303, payload pequeno ---"
+            curl -s -L --post302 --post303 -w "\nHTTP_STATUS:%{http_code}\n" -X POST \
+              "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" \
+              -H "Content-Type: text/plain;charset=utf-8" \
+              --data @/tmp/small.json
+          } > /tmp/debug.txt 2>&1
+
+          cat /tmp/debug.txt
+          B64=$(base64 -w0 /tmp/debug.txt)
+          SHA=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/contents/resultado_debug.txt" | jq -r '.sha // empty')
+          if [ -n "$SHA" ]; then
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_debug.txt" \
+              -d "{\"message\":\"debug post\",\"content\":\"$B64\",\"sha\":\"$SHA\",\"branch\":\"main\"}" -o /dev/null -w "PUT: %{http_code}\n"
+          else
+            curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/contents/resultado_debug.txt" \
+              -d "{\"message\":\"debug post\",\"content\":\"$B64\",\"branch\":\"main\"}" -o /dev/null -w "PUT: %{http_code}\n"
+          fi
