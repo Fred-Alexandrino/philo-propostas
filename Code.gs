@@ -144,7 +144,7 @@ function gerarProposta(body) {
   // 1) Abre o .docx original como ZIP
   let templateBlob;
   try {
-    templateBlob = DriveApp.getFileById(templateId).getBlob();
+    templateBlob = DriveApp.getFileById(templateId).getBlob().setContentType("application/zip");
   } catch (err) {
     throw new Error(`TEMPLATE_DOCX_ID inválido (${templateId}). Verifique o ID do arquivo .docx no Drive.`);
   }
