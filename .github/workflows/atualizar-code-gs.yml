@@ -8,35 +8,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Enviar Code.gs para o Apps Script e salvar resultado via API
+      - name: Enviar Code.gs via script python
+        run: python3 scripts/enviar_atualizacao.py > /tmp/resultado.txt 2>/tmp/resultado_stderr.txt; cat /tmp/resultado_stderr.txt; cat /tmp/resultado.txt
+      - name: Salvar resultado via API do GitHub
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          set -e
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-
-          jq -n --arg action "atualizarCodigo" --rawfile codigo Code.gs --arg senha "TROQUE_ESTA_SENHA" \
-            '{action:$action, novoCodigoGs:$codigo, senha:$senha}' > /tmp/payload.json
-
-          curl -s -D /tmp/headers1.txt -o /dev/null -X POST \
-            -A "$UA" \
-            -H "Content-Type: text/plain;charset=utf-8" \
-            --data @/tmp/payload.json \
-            "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec"
-
-          LOC=$(grep -i '^location:' /tmp/headers1.txt | sed 's/[Ll]ocation: //' | tr -d '\r')
-          echo "LOC=$LOC"
-
-          RESP=$(curl -s -A "$UA" -w "\nHTTP_STATUS:%{http_code}" "$LOC")
-
-          echo "$RESP" > /tmp/resultado_atualizacao.json
-          echo "$RESP"
-
-          B64=$(base64 -w0 /tmp/resultado_atualizacao.json)
+          set +e
+          cat /tmp/resultado_stderr.txt /tmp/resultado.txt > /tmp/final.txt
+          B64=$(base64 -w0 /tmp/final.txt)
           SHA=$(curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/repos/$REPO/contents/resultado_atualizacao.json" | jq -r '.sha // empty')
-
           if [ -n "$SHA" ]; then
             curl -s -X PUT -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/$REPO/contents/resultado_atualizacao.json" \
