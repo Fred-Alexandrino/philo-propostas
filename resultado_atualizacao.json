@@ -1,5 +1,5 @@
 Tamanho do payload: 13150 bytes
 action = 'atualizarCodigo'
-Redirecionado para: https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnTXqpik4zihooKokigldredWnfjIQJ-bPP3TOSTP_h4bgeoa16fsOyCorZMBZadfAkIYxyhson0WStkEU-OR_qodtu0hzOnW_5EaPpxOGKfQ5mrWuQaO_GBA66XQehMdSzzlxlf1ws5sui-yX4QJtk_TjdIQHpXWpE-zrXoPSpO-Y_oAFENB6gYYxcSuaF4cy9xFO7aHAxNRruyrgri7ZB6YAHyCyp-wZdktlvj1xL0H4n1lg8d7uS1pUse1sr-DayESeeqZf5vkZZcSNlEiGbPo48NzA&lib=MEpIBzzvsCFOpYLRsQM5Y9LjQiM8jbU1f
+Redirecionado para: https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRBm1FLdbRoYkLR-sVc4zUUuvn5FjQUOqiBHYn0ulk7IDAgYYiJdhjSuEYBDPJ3IeTANiK--iUqImPyvkFUd4xEW5JurPKuquNNL5fh49F2TYIufsw2whB1kK4nO7uee_cqlxrBv5o7B0QPVm5bAUCqvNJSJWlTCpLn9bJ06yeAv9k9nFdbpBerBRcGXHQNROQvaZDTkZpBWtbONPo8PF4JotGHMmwNQu5748v57Scn1GIuq8gNXyLhsZk0kgULQglv9ibs23ijg6x5Y-nHxHrsJ0mo9w&lib=MEpIBzzvsCFOpYLRsQM5Y9LjQiM8jbU1f
 Status final: 200
-{"ok":false,"erro":"Ação desconhecida."}
+{"ok":false,"erro":"Falha ao ler o projeto atual: {\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Request had insufficient authentication scopes.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"ACCESS_TOKEN_SCOPE_INSUFFICIENT\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"method\": \"google.apps.script.management.v1.ProjectsService.GetContent\",\n          \"service\": \"script.googleapis.com\"\n        }\n      }\n    ]\n  }\n}\n"}
