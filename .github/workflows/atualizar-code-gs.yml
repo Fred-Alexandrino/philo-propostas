@@ -19,10 +19,16 @@ jobs:
           jq -n --arg action "atualizarCodigo" --rawfile codigo Code.gs --arg senha "TROQUE_ESTA_SENHA" \
             '{action:$action, novoCodigoGs:$codigo, senha:$senha}' > /tmp/payload.json
 
-          RESP=$(curl -s -L -A "$UA" -w "\nHTTP_STATUS:%{http_code}" -X POST \
-            "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec" \
+          curl -s -D /tmp/headers1.txt -o /dev/null -X POST \
+            -A "$UA" \
             -H "Content-Type: text/plain;charset=utf-8" \
-            --data @/tmp/payload.json)
+            --data @/tmp/payload.json \
+            "https://script.google.com/macros/s/AKfycbwaqTeyXPt9XHQB3ZFIvc8sLensJxxOt7ahLPFaOjNgFOzdJ_TT6-6KvW9s-xGst6fqzg/exec"
+
+          LOC=$(grep -i '^location:' /tmp/headers1.txt | sed 's/[Ll]ocation: //' | tr -d '\r')
+          echo "LOC=$LOC"
+
+          RESP=$(curl -s -A "$UA" -w "\nHTTP_STATUS:%{http_code}" "$LOC")
 
           echo "$RESP" > /tmp/resultado_atualizacao.json
           echo "$RESP"
